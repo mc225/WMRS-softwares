@@ -5,7 +5,8 @@ function varargout = WMRS_GUI(varargin)
 
 % Begin initialization code - DO NOT EDIT
 
-% by Copyright @ Mingzhou Chen, University of St Andrews, Email: mingzhou.chen@st-andrews.ac.uk.
+% by Copyright @ Mingzhou Chen, University of St Andrews, Email:
+% mingzhou.chen@st-andrews.ac.uk. 26 August, 2016
 
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
