@@ -196,7 +196,8 @@ if exist(fname,'file')
 else
     %init laser
     laser.src = 1;   %by default, Solstis;
-    laser.controller = []; %
+    laser.smc = []; % smc100 controller on 3900s
+    laser.sol = []; % solstis controller on M2 laser;
     laser.counter = []; 
     laser.start = 784.5; %nm
     laser.end = 785.5;    %nm
@@ -270,7 +271,7 @@ update_waitbar(handles,0,'Initializing ImagingSource camera.............Please w
 try 
     vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1024x768)');
 catch 
-    vid = [];
+    vid = [];src = []; image = []; hImage = [];
     warning('Camera is not connected!!');
 end
 if ~isempty(vid)
@@ -337,26 +338,25 @@ acquireOpt.andor = ad;
 %initialize laser;
 if laser.src == 1 % SolsTis;
     update_waitbar(handles,0,'Initializing Solstis.............Please wait......',1);
-    try
-        [sol,ii]=solstisINI();
-    catch
-        sol = []; ii = 2;
-        fprintf('\n');
-        warning('Solstis is not initialized successfully!');
-    end
-    laser.controller = sol;
-    laser.counter = ii;
+    [sol,ii]=solstisINI();
+    laser.sol = sol;
     if ~isempty(sol)        
+        laser.counter = ii;
         laser.counter = solstisWAVE(sol,ii,(laser.start+laser.end)/2); %move to the middle position;
     else
         update_waitbar(handles,0,'No successful connection to Solstis!!!',1);
-        warning('No connection to Solstis!!');
     end
     set(handles.laserSolstis,'Value',1);
     set(handles.laser3900s,'Value',0);
 else % 3900s
-    set(handles.laserSolstis,'Value',0);
-    set(handles.laser3900s,'Value',1);
+    smc = SMC100();
+    laser.smc = smc;
+    if ~isemtpy(smc)
+        set(handles.laserSolstis,'Value',0);
+        set(handles.laser3900s,'Value',1);
+    else
+        warning('SMC100 is not initialized successfully!');
+    end
 end 
 
 %set all user data;
@@ -386,10 +386,22 @@ if ~isempty(acquireOpt.andor)
 end
 
 if ~isempty(acquireOpt.camera)
-    if (strcmpi(acquireOpt.camera.vid.Running,'on'))
-        stop(acquireOpt.camera.vid);
+    if ishandle(acquireOpt.camera.vid)
+        if (strcmpi(acquireOpt.camera.vid.Running,'on'))
+            stop(acquireOpt.camera.vid);
+        end
+        delete(acquireOpt.camera.vid);
+        acquireOpt.camera = [];
     end
-    delete(acquireOpt.camera.vid);
+end
+
+if isempty(laser.smc) %relase 3900s;
+    laser.smc.releaseSMC();
+end
+
+if ~isempty(laser.sol) %release solstis;
+    fclose(laser.sol);
+    echotcpip('off');
 end
 
 save('systemInit.mat','laser','','fileOpt','spectrometer');
@@ -935,8 +947,8 @@ if ~isnan(laserStart)
             update_waitbar(handles,0,sprintf('Laser start setting range is %d - %d nm', startLowLimit,startUpLimit),1);
             set(hObject,'String',num2str(laser.start));
         end
-        if ~isempty(laser.controller)
-            laser.counter = solstisWAVE(laser.controller,laser.counter,(laser.start+laser.end)/2); %set wavelength back to middle;
+        if ~isempty(laser.sol)
+            laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start+laser.end)/2); %set wavelength back to middle;
             setUserData('laser',laser);
         end
     else %3900s
@@ -986,8 +998,8 @@ if ~isnan(laserEnd)
             update_waitbar(handles,0,sprintf('Laser start setting range is %d - %d nm', startLowLimit,startUpLimit),1);
             set(hObject,'String',num2str(laser.end));
         end
-        if ~isempty(laser.controller)
-            laser.counter = solstisWAVE(laser.controller,laser.counter,(laser.start+laser.end)/2); %set wavelength back to middle;
+        if ~isempty(laser.sol)
+            laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start+laser.end)/2); %set wavelength back to middle;
             setUserData('laser',laser);
         end
     else %3900s
@@ -1242,17 +1254,15 @@ laser = getUserData('laser');
 laser.src = get(hObject,'Value');
 update_waitbar(handles,0,'Select Solstis as laser source now.');
 
-if isempty(laser.controller)
+if isempty(laser.sol)
     update_waitbar(handles,0,'Initializing Solstis.............Please wait......');
-    try
-        [sol,ii]=solstisINI();
-    catch
-        sol = []; ii = 2;
-        fprintf('\n');
-        warning('Solstis can not be initialized successfully!');
-    end
-    laser.controller = sol;
+    [sol,ii]=solstisINI();
+    laser.sol = sol;
     laser.counter = ii;
+    if isempty(laser.sol)
+        update_waitbar(handles,0,'No successful connection to Solstis!!!',1);
+        return;
+    end
 end
 
 %verify the tuning range;
@@ -1267,8 +1277,8 @@ if laser.end<startLowLimit||laser.end>startUpLimit
     update_waitbar(handles,0,'Tuning range is out of limit! Has been set back to default. Please check',1);
     set(handles.laserEnd,'String',num2str(laser.end));
 end
-if ~isempty(laser.controller)
-    laser.counter = solstisWAVE(laser.controller,laser.counter,(laser.start+laser.end)/2); %move to the middle position;
+if ~isempty(laser.sol)
+    laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start+laser.end)/2); %move to the middle position;
     update_waitbar(handles,0,sprintf('Laser has been tuned to %3.1fnm',(laser.start+laser.end)/2));
 else
     update_waitbar(handles,0,'No successful connection to Solstis!!!',1);
@@ -1306,10 +1316,18 @@ laser = getUserData('laser');
 %fileOpt = getUserData('fileOpt');
 laser.src = get(hObject,'Value');
 update_waitbar(handles,0,'Select 3900s as laser source now.');
-update_waitbar(handles,0,'Under construction....')
-if isempty(laser.controller)
-else
+
+if isempty(laser.smc)
+    smc = SMC100();
+    if ~isempty(smc)
+        laser.smc = smc;
+    else
+        laser.smc = [];
+        warning('SMC100 is not initialized successfully!');
+    end    
+    setUserData('laser',laser);
 end
+
 
 
 % --- Executes on button press in saveSpecRadio.
@@ -1356,99 +1374,63 @@ if isempty(ad)
     return;
 end
 if laser.src == 1 %solstis
-    if isempty(laser.controller)
+    if isempty(laser.sol)
         update_waitbar(handles,0,'No SolsTis laser was connected!',1);
         return;
     end
 else
+    if isempty(laser.smc)
+        update_waitbar(handles,0,'No 3900s laser was connected!',1);
+        return;
+    end
 end
 
 
 SetAllGUIButtons(handles,0);
-if laser.src == 1 %solstis
-    sol = laser.controller;
-    lambdamin=min(laser.start,laser.end);
-    lambdamax=max(laser.start,laser.end);
-    if spectrometer.scans > 1 %WMRS
-        set(handles.isWMRS,'Enable','on');        
-        lambdaincr=lambdamax-lambdamin;%nm
-        lambda = linspace(lambdamin,lambdamax,spectrometer.scans);
-        acquireOpt.spectra = [];
-        laser.counter = solstisWAVE(sol,laser.counter,lambdamin);
-        if laser.continuous %continuous tuning;
-            if ad.ReadMode ~=0  %set to FVB mode;
-                update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
-                ad.ReadMode=0;
-            end
-            if ad.AcquisitionMode ~=3  %set to Kinetics mode;
-                ad.AcquisitionMode=3;
-            end
-            scantime = spectrometer.accums*spectrometer.exposureTime*spectrometer.scans;
-            [ret] = PrepareAcquisition();
-            if ad.startAcquire == 1
-                tic;
-                while toc<scantime
-                    lam=lambdamin+toc/scantime*lambdaincr;
-                    laser.counter = solstisWAVE(sol, laser.counter, lam);
-                    if toc/scantime<=1
-                        perc = toc/scantime;
-                    else
-                        perc = 1;                        
-                    end
-                    update_waitbar(handles,perc,sprintf('Tune wavelength to %5.3fnm.........Acquiring Raman spectrum...',lam));
-                end
-                while ad.isAndorIdle~=1
-                    %wait until acquisition finish;
-                end
-                acquireOpt.spectra=(ad.getImage).';
-            else
-                update_waitbar(handles,0,'Spectra acquiring is not correctly started.........Please check and try again!',1);
-                acquireOpt.spectra = [];
-            end                                
-        else %step tuning;
-            if ad.ReadMode ~=0  %set to FVB mode;
-                update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
-                ad.ReadMode=0;
-            end
-            if spectrometer.accums == 1
-                if ad.AcquisitionMode ~=1  %set to single scan mode;
-                    ad.AcquisitionMode=1;
-                end
-            else
-                if ad.AcquisitionMode ~=2  %set to accumulation mode;
-                    ad.AcquisitionMode = 2;
-                end
-            end
-            update_waitbar(handles,0,'Start acquiring Raman spectra...........');
-            [ret] = PrepareAcquisition();
-            for mm = 1:spectrometer.scans
-                laser.counter = solstisWAVE(sol, laser.counter, lambda(mm));
-                spec = [];cc=0;                       
-                spec = ad.acquire0;
-                while isempty(spec)||(~all(spec)) && cc<5 %try 5 time to ensure acquire data;
-                    spec = ad.acquire0;
-                    cc=cc+1;
-                end
-                if ~isempty(spec)
-                    acquireOpt.spectra = [acquireOpt.spectra spec];
-                end                
-                update_waitbar(handles,mm/spectrometer.scans,sprintf('No.%d Raman spectrum has been acquired @ wavelength %5.3fnm ',mm,lambda(mm)))
-            end            
+
+lambdamin=min(laser.start,laser.end);
+lambdamax=max(laser.start,laser.end);
+if spectrometer.scans > 1 %WMRS
+    set(handles.isWMRS,'Enable','on');
+    lambdaincr=lambdamax-lambdamin;%nm
+    lambda = linspace(lambdamin,lambdamax,spectrometer.scans);
+    acquireOpt.spectra = [];
+    if laser.src == 1 %solstis
+        laser.counter = solstisWAVE(sol,laser.counter,lambdamin); %move to min wavelength;
+    else %3900s
+        
+    end
+    if laser.continuous %continuous tuning;
+        if ad.ReadMode ~=0  %set to FVB mode;
+            update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
+            ad.ReadMode=0;
         end
-        laser.counter = solstisWAVE(sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
-        if isempty(acquireOpt.spectra)
-            acquireOpt.WMRSpectrum = [];
+        if ad.AcquisitionMode ~=3  %set to Kinetics mode;
+            ad.AcquisitionMode=3;
+        end
+        scantime = spectrometer.accums*spectrometer.exposureTime*spectrometer.scans;
+        [ret] = PrepareAcquisition();
+        if ad.startAcquire == 1
+            tic;
+            while toc<scantime
+                lam=lambdamin+toc/scantime*lambdaincr;
+                laser.counter = solstisWAVE(sol, laser.counter, lam);
+                if toc/scantime<=1
+                    perc = toc/scantime;
+                else
+                    perc = 1;
+                end
+                update_waitbar(handles,perc,sprintf('Tune wavelength to %5.3fnm.........Acquiring Raman spectrum...',lam));
+            end
+            while ad.isAndorIdle~=1
+                %wait until acquisition finish;
+            end
+            acquireOpt.spectra=(ad.getImage).';
         else
-            acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
-            update_waitbar(handles,0,' ');
+            update_waitbar(handles,0,'Spectra acquiring is not correctly started.........Please check and try again!',1);
+            acquireOpt.spectra = [];
         end
-        if spectrometer.isWMRS
-            updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.WMRSpectrum);
-        else
-            updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.spectra);
-        end
-        set(handles.isWMRS,'Enable','on');
-    else %single spectra
+    else %step tuning;
         if ad.ReadMode ~=0  %set to FVB mode;
             update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
             ad.ReadMode=0;
@@ -1462,19 +1444,74 @@ if laser.src == 1 %solstis
                 ad.AcquisitionMode = 2;
             end
         end
+        update_waitbar(handles,0,'Start acquiring Raman spectra...........');
+        [ret] = PrepareAcquisition();
+        for mm = 1:spectrometer.scans
+            if laser.src == 1 %solstis
+                laser.counter = solstisWAVE(laser.sol, laser.counter, lambda(mm));
+            else %3900s
+                
+            end
+            
+            spec = [];cc=0;
+            spec = ad.acquire0;
+            while isempty(spec)||(~all(spec)) && cc<5 %try 5 time to ensure acquire data;
+                spec = ad.acquire0;
+                cc=cc+1;
+            end
+            if ~isempty(spec)
+                acquireOpt.spectra = [acquireOpt.spectra spec];
+            end
+            update_waitbar(handles,mm/spectrometer.scans,sprintf('No.%d Raman spectrum has been acquired @ wavelength %5.3fnm ',mm,lambda(mm)))
+        end
+    end
+    if laser.src == 1 %solstis
         laser.counter = solstisWAVE(sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
-        update_waitbar(handles,0,'Acquiring one spectrum.....');
-        spectrometer.isWMRS = 0;
-        set(handles.isWMRS,'Enable','off');
-        set(handles.isWMRS,'Value',spectrometer.isWMRS);
-        acquireOpt.spectra = ad.acquire0;
-        acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
-        updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.spectra);
+    else %3900s
+        
+    end
+    if isempty(acquireOpt.spectra)
+        acquireOpt.WMRSpectrum = [];
+    else
+        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
         update_waitbar(handles,0,' ');
     end
-else %3900s
-    %under construction;
+    if spectrometer.isWMRS
+        updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.WMRSpectrum);
+    else
+        updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.spectra);
+    end
+    set(handles.isWMRS,'Enable','on');
+else %single spectra
+    if ad.ReadMode ~=0  %set to FVB mode;
+        update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
+        ad.ReadMode=0;
+    end
+    if spectrometer.accums == 1
+        if ad.AcquisitionMode ~=1  %set to single scan mode;
+            ad.AcquisitionMode=1;
+        end
+    else
+        if ad.AcquisitionMode ~=2  %set to accumulation mode;
+            ad.AcquisitionMode = 2;
+        end
+    end
+    if laser.src == 1 %solstis
+        laser.counter = solstisWAVE(sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+    else %3900s
+        
+    end
+    update_waitbar(handles,0,'Acquiring one spectrum.....');
+    spectrometer.isWMRS = 0;
+    set(handles.isWMRS,'Enable','off');
+    set(handles.isWMRS,'Value',spectrometer.isWMRS);
+    acquireOpt.spectra = ad.acquire0;
+    acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
+    updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.spectra);
+    update_waitbar(handles,0,' ');
 end
+
+
 SetAllGUIButtons(handles,1);
 if size(acquireOpt.spectra,2)==1
     set(handles.isWMRS,'Enable','off');
