@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 18-Jul-2016 11:36:54
+% Last Modified by GUIDE v2.5 02-Sep-2016 15:03:52
 
 % Begin initialization code - DO NOT EDIT
 
@@ -263,7 +263,9 @@ if ~isempty(fileOpt.imgFolder)
     set(handles.imgFolder,'String',fileOpt.imgFolder);
 end  
 axes(handles.specPlot);
-xlabel('Raman shift (nm)');
+h = xlabel('Raman shift (nm)');
+pos = get(h,'pos'); % Read position [x y z]
+set(h,'pos',pos.*[1.085 1 1]) % Move label to right
 ylabel('Raman intensity (counts)');  
 
 %initialize camera; %current support only imagingSource USB cam;
@@ -395,7 +397,7 @@ if ~isempty(acquireOpt.camera)
     end
 end
 
-if isempty(laser.smc) %relase 3900s;
+if ~isempty(laser.smc) %relase 3900s;
     laser.smc.releaseSMC();
 end
 
@@ -1526,7 +1528,9 @@ function updateWMRSpec(axs,axisWave,spec)
 axes(axs);hold off;
 plot(axisWave,spec);
 axis tight;grid on;
-xlabel('Raman shift (nm)');
+h = xlabel('Raman shift (nm)');
+pos = get(h,'pos'); % Read position [x y z]
+set(h,'pos',pos.*[1.085 1 1]) % Move label to right
 ylabel('Raman intensity (counts)');
 
 
@@ -1658,3 +1662,26 @@ end
 SetAllGUIButtons(handles,0);
 acquireOpt.andor.acquireLive;
 SetAllGUIButtons(handles,1);
+
+
+% --- Executes on selection change in SelectCam.
+function SelectCam_Callback(hObject, eventdata, handles)
+% hObject    handle to SelectCam (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns SelectCam contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from SelectCam
+
+
+% --- Executes during object creation, after setting all properties.
+function SelectCam_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to SelectCam (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
