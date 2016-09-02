@@ -106,15 +106,15 @@ classdef Andor < handle
             [ret,XPixels, YPixels]=GetDetector; CheckWarning(ret);
             Andor.CCDsize = [XPixels, YPixels];
             
-            %Initialize parameters;            
+            % Initialize parameters;            
             [ret, mintemp, maxtemp] = GetTemperatureRange();
             CheckWarning(ret);
-%             if nargin < 1
-%                 CCDSettingTemp = -70;   %CCD temperature at -70 Celsius by default;
-%             elseif CCDSettingTemp<mintemp || CCDSettingTemp>maxtemp 
-%                 CCDSettingTemp = -70;
-%             end
-%             Andor.CCDSettingTemp = CCDSettingTemp;
+            if nargin < 1
+                CCDSettingTemp = -70;   %CCD temperature at -70 Celsius by default;
+            elseif CCDSettingTemp<mintemp || CCDSettingTemp>maxtemp 
+                CCDSettingTemp = -70;
+            end
+            Andor.CCDSettingTemp = CCDSettingTemp;
                         
             if nargin<2
                 AcquisitionMode = 1;                          %AcquisitionMode,1 - Single Scan by default, 2 - Accumulate, 3 - Kinetics, 4 - Fast Kinetics, 5 - Run till abort;
@@ -241,7 +241,7 @@ classdef Andor < handle
             end
             
             [ret, temp] = GetTemperature(); %get the CCD tempertature;
-            if newCCDSettingTemp ~= temp
+            if newCCDSettingTemp ~= temp || ret ~= atmcd.DRV_TEMP_STABILIZED
                 ret = SetTemperature(newCCDSettingTemp);
                 CheckWarning(ret);                
                 %waiting for cooling down and temp stablization;
@@ -260,6 +260,7 @@ classdef Andor < handle
                     pause(1);
                     [ret, temp] = GetTemperature();
                     if ret == atmcd.DRV_NOT_INITIALIZED || ret == atmcd.DRV_ACQUIRING || ret == atmcd.DRV_ERROR_ACK || ret == atmcd.DRV_TEMP_OFF
+                        CheckWarning(ret);
                         warning('Error occurs...Please check!')
                         break;
                     end
@@ -764,12 +765,12 @@ classdef Andor < handle
         function releaseAndor()
             [ret]=SetShutter(1, 2, 1, 1); %close shutter
             CheckWarning(ret);
-%             [ret, iCoolerStatus] = IsCoolerOn();
-%             CheckWarning(ret);
-%             if iCoolerStatus
-%                 ret = CoolerOFF();
-%                 CheckWarning(ret);
-%             end
+            [ret, iCoolerStatus] = IsCoolerOn();
+            CheckWarning(ret);
+            if iCoolerStatus
+                ret = CoolerOFF();
+                CheckWarning(ret);
+            end
             [ret] = SetCoolerMode(1); % keep cooler on;
             CheckWarning(ret);
             
