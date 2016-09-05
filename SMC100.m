@@ -34,9 +34,9 @@ classdef SMC100 < handle
                     end
                 end
                 a = instrhwinfo('serial');
-                if isempty(a)
+                if isempty(a.AvailableSerialPorts)
                     fprintf('No SMC controller has been connected....\n');
-                    SMC100 = [];
+                    SMC100.SMCobj = [];
                     return;
                 end
                 for m = 1:size(a.AvailableSerialPorts,1)
@@ -70,7 +70,7 @@ classdef SMC100 < handle
                         fprintf('Failed to open SMC controller on %s port!!!\n',COMport);
                         fprintf('No SMC controller has been connected!\n');
                         fclose(obj);
-                        SMC100 = [];
+                        SMC100.SMCobj= [];
                         return;
                     end
                 catch
@@ -78,12 +78,12 @@ classdef SMC100 < handle
                     fprintf('Cannot open SMC controller on %s port....please wait.....\n',COMport);
                 end
             end
-%             status=query(obj,'1mm?');
+            status=query(obj,'1mm?');
             if length(status)<5 %wrong com device
                 fclose(obj);
                 SMC100.SMCobj=[];
                 fprintf('No SMC controller has been connected!\n');
-                SMC100 = [];
+                SMC100.SMCobj = [];
                 return;
             else
                 if status(5) == '2'||status(5) == '3'|| status(5) == '4'

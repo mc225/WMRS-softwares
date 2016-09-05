@@ -351,12 +351,13 @@ if laser.src == 1 % SolsTis;
     set(handles.laserSolstis,'Value',1);
     set(handles.laser3900s,'Value',0);
 else % 3900s
-    smc = SMC100();
-    laser.smc = smc;
-    if ~isemtpy(smc)
+    smc = SMC100();    
+    if ~isemtpy(smc.SMCobj)
+        laser.smc = smc;
         set(handles.laserSolstis,'Value',0);
         set(handles.laser3900s,'Value',1);
     else
+        laser.smc = [];
         warning('SMC100 is not initialized successfully!');
     end
 end 
@@ -1317,19 +1318,46 @@ laser = getUserData('laser');
 %spectrometer = getUserData('spectrometer');
 %fileOpt = getUserData('fileOpt');
 laser.src = get(hObject,'Value');
-update_waitbar(handles,0,'Select 3900s as laser source now.');
 
 if isempty(laser.smc)
     smc = SMC100();
-    if ~isempty(smc)
+    if ~isempty(smc.SMCobj)
         laser.smc = smc;
+        update_waitbar(handles,0,'3900s is selected as laser source now.');
     else
         laser.smc = [];
-        warning('SMC100 is not initialized successfully!');
+        update_waitbar(handles,0,'SMC100 cannot be initialized successfully!',1);
     end    
     setUserData('laser',laser);
+else %Check smc status;
+    try
+        status=query(laser.smc.SMCobj,'1mm?');
+    catch
+        if ~isempty(laser.smc.SMCobj)
+            laser.smc.releaseSMC();
+        end
+        laser.smc = [];
+        update_waitbar(handles,0,'SMC100 has been disconnected, retry!');
+        setUserData('laser',laser);
+        return;
+    end
+    if length(status)<5 %wrong com device
+        if ~isempty(laser.smc.SMCobj)
+            laser.smc.releaseSMC();
+        end
+        laser.smc = [];
+        update_waitbar(handles,0,'SMC100 has been disconnected!');
+    elseif status(5) == '2'||status(5) == '3'|| status(5) == '4'
+        update_waitbar(handles,0,'3900s is selected as laser source now.');
+    else
+        if ~isempty(laser.smc.SMCobj)
+            laser.smc.releaseSMC();
+        end
+        laser.smc = [];
+        update_waitbar(handles,0,'SMC100 is wrong, please check!');
+    end
+    setUserData('laser',laser);
 end
-
 
 
 % --- Executes on button press in saveSpecRadio.

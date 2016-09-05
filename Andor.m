@@ -201,8 +201,14 @@ classdef Andor < handle
         end
         function ShamrockDev = get.ShamrockDev(Andor)
             [ret, deviceCount] = ShamrockGetNumberDevices();
-            ShamrockCheckWarning(ret);
-            ShamrockDev = deviceCount-1;
+%             ShamrockCheckWarning(ret);
+            if ret == Shamrock.SHAMROCK_SUCCESS
+                if deviceCount == 2 %strange in lab 106, return deviceCount 2!!!!! 
+                    ShamrockDev = 0;
+                else
+                    ShamrockDev = deviceCount-1;
+                end
+            end    
         end        
         function noGrating = get.noGratings(Andor)
             noGrating = GetNumberofAvailableGratings(Andor);
@@ -228,7 +234,7 @@ classdef Andor < handle
             end
             [ret, iCoolerStatus] = IsCoolerOn();
             CheckWarning(ret);
-            if iCoolerStatus
+            if ~iCoolerStatus
                 [ret]=CoolerON();                             %   Turn on temperature cooler
                 CheckWarning(ret);
             end
@@ -241,7 +247,7 @@ classdef Andor < handle
             end
             
             [ret, temp] = GetTemperature(); %get the CCD tempertature;
-            if newCCDSettingTemp ~= temp || ret ~= atmcd.DRV_TEMP_STABILIZED
+            if newCCDSettingTemp ~= temp || ret ~= atmcd.DRV_TEMPERATURE_STABILIZED
                 ret = SetTemperature(newCCDSettingTemp);
                 CheckWarning(ret);                
                 %waiting for cooling down and temp stablization;
@@ -250,7 +256,7 @@ classdef Andor < handle
                 mnum = length(msg);
                 fprintf(msg);
                 [ret, temp] = GetTemperature();
-                while ret ~= atmcd.DRV_TEMP_STABILIZED % temperature is not stablized. Wait until set;                    
+                while ret ~= atmcd.DRV_TEMPERATURE_STABILIZED % temperature is not stablized. Wait until set;                    
                     for mm = 1:mnum
                         fprintf('\b');
                     end
@@ -259,9 +265,9 @@ classdef Andor < handle
                     fprintf(msg);
                     pause(1);
                     [ret, temp] = GetTemperature();
-                    if ret == atmcd.DRV_NOT_INITIALIZED || ret == atmcd.DRV_ACQUIRING || ret == atmcd.DRV_ERROR_ACK || ret == atmcd.DRV_TEMP_OFF
-                        CheckWarning(ret);
-                        warning('Error occurs...Please check!')
+                    if ret == atmcd.DRV_NOT_INITIALIZED || ret == atmcd.DRV_ACQUIRING || ret == atmcd.DRV_ERROR_ACK || ret == atmcd.DRV_TEMPERATURE_OFF
+%                         CheckWarning(ret);
+                        warning('Temperature seeting error occurs...Please check!')
                         break;
                     end
                 end
