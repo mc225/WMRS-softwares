@@ -74,7 +74,6 @@ classdef Andor < handle
     
     methods
         function Andor = Andor(CCDSettingTemp, AcquisitionMode, ExposureTime, ReadMode, TriggerMode, PreAmpGain, NumberKinetics, NumberAccumulations,CropHeight,CosmicRayFilterOn)
-            clc;
             fprintf('Initialising Andor camera... please wait!......');
             [ret]=AndorInitialize('');      %initialization camera
             CheckError(ret);

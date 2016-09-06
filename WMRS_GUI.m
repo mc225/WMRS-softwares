@@ -271,7 +271,7 @@ ylabel('Raman intensity (counts)');
 %initialize camera; %current support only imagingSource USB cam;
 update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
 try 
-    vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1024x768)');
+    vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
 catch 
     vid = [];src = []; image = []; hImage = [];
     warning('Camera is not connected!!');
@@ -350,6 +350,8 @@ if laser.src == 1 % SolsTis;
     end
     set(handles.laserSolstis,'Value',1);
     set(handles.laser3900s,'Value',0);
+    set(handles.laserStart,'String',num2str(laser.start(1)));
+    set(handles.laserEnd,'String',num2str(laser.end(1)));
 else % 3900s
     smc = SMC100();    
     if ~isempty(smc.SMCobj)
@@ -360,6 +362,8 @@ else % 3900s
         laser.smc = [];
         warning('SMC100 is not initialized successfully!');
     end
+    set(handles.laserStart,'String',num2str(laser.start(2)));
+    set(handles.laserEnd,'String',num2str(laser.end(2)));
 end 
 
 %set all user data;
