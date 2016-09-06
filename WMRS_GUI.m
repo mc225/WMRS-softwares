@@ -199,8 +199,8 @@ else
     laser.smc = []; % smc100 controller on 3900s
     laser.sol = []; % solstis controller on M2 laser;
     laser.counter = []; 
-    laser.start = 784.5; %nm
-    laser.end = 785.5;    %nm
+    laser.start = [786.5 16.30];    %[nm mm]
+    laser.end = [787.5 16.45];    %[nm mm]
     laser.continuous = 0; %step scanning;
     laser.marker = [];
     laser.markerCross = [];
@@ -352,7 +352,7 @@ if laser.src == 1 % SolsTis;
     set(handles.laser3900s,'Value',0);
 else % 3900s
     smc = SMC100();    
-    if ~isemtpy(smc.SMCobj)
+    if ~isempty(smc.SMCobj)
         laser.smc = smc;
         set(handles.laserSolstis,'Value',0);
         set(handles.laser3900s,'Value',1);
@@ -938,28 +938,45 @@ laser = getUserData('laser');
 %fileOpt = getUserData('fileOpt');
 laserStart = str2double(get(hObject,'String'));
 if ~isnan(laserStart)
+    laserStart = laserStart(1);
     if laser.src == 1 %solstis
         %verify range
-        laserStart = laserStart(1);
         startLowLimit = 770; startUpLimit = 800;
         if laserStart >= startLowLimit && laserStart <= startUpLimit
-            laser.start = laserStart;
+            laser.start(1) = laserStart;
             setUserData('laser',laser);
-            update_waitbar(handles,0,sprintf('Laser tuning start at %3.1fnm', laser.start));
+            update_waitbar(handles,0,sprintf('Laser tuning start has been set at %3.1fnm', laser.start(1)));
         else
             update_waitbar(handles,0,sprintf('Laser start setting range is %d - %d nm', startLowLimit,startUpLimit),1);
-            set(hObject,'String',num2str(laser.start));
+            set(hObject,'String',num2str(laser.start(1)));
         end
-        if ~isempty(laser.sol)
-            laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start+laser.end)/2); %set wavelength back to middle;
-            setUserData('laser',laser);
-        end
+        setUserData('laser',laser);
+%         if ~isempty(laser.sol)%set to the middle;
+%             laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start(1)+laser.end(1))/2); %set wavelength back to middle;            
+%         end
     else %3900s
-        update_waitbar(handles,0,'Under construction......',1);
+         %verify range
+        startLowLimit = 15; startUpLimit = 18; %need to check for each system;
+        if laserStart >= startLowLimit && laserStart <= startUpLimit
+            laser.start(2) = laserStart;
+            setUserData('laser',laser);
+            update_waitbar(handles,0,sprintf('SMC tuning start has been set at %2.4fmm', laser.start(2)));
+        else
+            update_waitbar(handles,0,sprintf('SMC tuning start setting range is %d - %d nm', startLowLimit,startUpLimit),1);
+            set(hObject,'String',num2str(laser.start(2)));
+        end
+        setUserData('laser',laser);
+%         if ~isempty(laser.smc)%set to the middle;
+%             laser.smc.moveTo((laser.start(2)+laser.end(2))/2); %set wavelength back to middle;
+%         end
     end
 else
     update_waitbar(handles,0,'Please input correct wavelength in nm or position in mm!!!!!',1);
-    set(hObject,'String',num2str(laser.start));
+    if laser.src == 1 %solstis
+        set(hObject,'String',num2str(laser.start(1)));
+    else %3900s;
+        set(hObject,'String',num2str(laser.start(2)));
+    end
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -989,28 +1006,44 @@ laser = getUserData('laser');
 %fileOpt = getUserData('fileOpt');
 laserEnd = str2double(get(hObject,'String'));
 if ~isnan(laserEnd)
+    laserEnd = laserEnd(1);
     if laser.src == 1 %solstis
         %verify range
-        laserEnd = laserEnd(1);
         startLowLimit = 770; startUpLimit = 800;
         if laserEnd >= startLowLimit && laserEnd <= startUpLimit
-            laser.end = laserEnd;
+            laser.end(1) = laserEnd;
             setUserData('laser',laser);
-            update_waitbar(handles,0,sprintf('Laser tuning start at %3.1fnm', laser.end));
+            update_waitbar(handles,0,sprintf('Laser tuning start has been set at %3.1fnm', laser.end));
         else
             update_waitbar(handles,0,sprintf('Laser start setting range is %d - %d nm', startLowLimit,startUpLimit),1);
-            set(hObject,'String',num2str(laser.end));
+            set(hObject,'String',num2str(laser.end(1)));
         end
-        if ~isempty(laser.sol)
-            laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start+laser.end)/2); %set wavelength back to middle;
-            setUserData('laser',laser);
-        end
+        setUserData('laser',laser);
+%         if ~isempty(laser.sol)%set to the middle;
+%             laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start(1)+laser.end(1))/2); %set wavelength back to middle; 
+%         end
     else %3900s
-        update_waitbar(handles,0,'Under construction......',1);
+        startLowLimit = 15; startUpLimit = 18; %need to check for each system;
+        if laserEnd >= startLowLimit && laserEnd <= startUpLimit
+            laser.end(2) = laserEnd;
+            setUserData('laser',laser);
+            update_waitbar(handles,0,sprintf('SMC tuning end has been set to %2.4fmm', laser.end(2)));
+        else
+            update_waitbar(handles,0,sprintf('SMC tuning end setting range is %d - %d mm', startLowLimit,startUpLimit),1);
+            set(hObject,'String',num2str(laser.end(2)));
+        end
+        setUserData('laser',laser);
+%         if ~isempty(laser.smc) %set to the middle;
+%             laser.smc.moveTo((laser.start(2)+laser.end(2))/2); %set wavelength back to middle;
+%         end
     end
 else
     update_waitbar(handles,0,'Please input correct wavelength in nm or position in mm!!!!!',1);
-    set(hObject,'String',num2str(laser.end));
+    if laser.src == 1 %solstis
+        set(hObject,'String',num2str(laser.end(1)));
+    else
+        set(hObject,'String',num2str(laser.end(2)));
+    end
 end
 
 % --- Executes during object creation, after setting all properties.
@@ -1254,8 +1287,13 @@ function laserSolstis_Callback(hObject, eventdata, handles)
 laser = getUserData('laser');
 %spectrometer = getUserData('spectrometer');
 %fileOpt = getUserData('fileOpt');
-laser.src = get(hObject,'Value');
+if get(hObject,'Value')
+    laser.src = 1;
+end
 update_waitbar(handles,0,'Select Solstis as laser source now.');
+
+set(handles.laserStart,'String',num2str(laser.start(1)));
+set(handles.laserEnd,'String',num2str(laser.end(1)));
 
 if isempty(laser.sol)
     update_waitbar(handles,0,'Initializing Solstis.............Please wait......');
@@ -1267,22 +1305,22 @@ if isempty(laser.sol)
         return;
     end
 end
+% %verify the tuning range;
+% startLowLimit = 770; startUpLimit = 800;
+% if laser.start(1)<startLowLimit||laser.start(1)>startUpLimit
+%     laser.start = 784.5;
+%     update_waitbar(handles,0,'Tuning range is out of limit! Has been set back to default. Please check',1);
+%     set(handles.laserStart,'String',num2str(laser.start(1)));
+% end
+% if laser.end<startLowLimit||laser.end>startUpLimit
+%     laser.end = 785.5;
+%     update_waitbar(handles,0,'Tuning range is out of limit! Has been set back to default. Please check',1);
+%     set(handles.laserEnd,'String',num2str(laser.end(1)));
+% end
 
-%verify the tuning range;
-startLowLimit = 770; startUpLimit = 800;
-if laser.start<startLowLimit||laser.start>startUpLimit
-    laser.start = 784.5;
-    update_waitbar(handles,0,'Tuning range is out of limit! Has been set back to default. Please check',1);
-    set(handles.laserStart,'String',num2str(laser.start));
-end
-if laser.end<startLowLimit||laser.end>startUpLimit
-    laser.end = 785.5;
-    update_waitbar(handles,0,'Tuning range is out of limit! Has been set back to default. Please check',1);
-    set(handles.laserEnd,'String',num2str(laser.end));
-end
 if ~isempty(laser.sol)
-    laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start+laser.end)/2); %move to the middle position;
-    update_waitbar(handles,0,sprintf('Laser has been tuned to %3.1fnm',(laser.start+laser.end)/2));
+    laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start(1)+laser.end(1))/2); %move to the middle position;
+    update_waitbar(handles,0,sprintf('Laser has been tuned to %3.1fnm',(laser.start(1)+laser.end(1))/2));
 else
     update_waitbar(handles,0,'No successful connection to Solstis!!!',1);
     warning('No connection to Solstis!!');
@@ -1317,8 +1355,12 @@ function laser3900s_Callback(hObject, eventdata, handles)
 laser = getUserData('laser');
 %spectrometer = getUserData('spectrometer');
 %fileOpt = getUserData('fileOpt');
-laser.src = get(hObject,'Value');
+if get(hObject,'Value')
+    laser.src = 0; %3900s
+end
 
+set(handles.laserStart,'String',num2str(laser.start(2)));
+set(handles.laserEnd,'String',num2str(laser.end(2)));
 if isempty(laser.smc)
     smc = SMC100();
     if ~isempty(smc.SMCobj)
@@ -1358,6 +1400,11 @@ else %Check smc status;
     end
     setUserData('laser',laser);
 end
+
+% if ~isempty(laser.smc)
+%     laser.smc.moveTo((laser.start(2)+laser.end(2))/2);
+%     update_waitbar(handles,0,sprintf('SMC has been tuned to %2.4fnm',(laser.start(2)+laser.end(2))/2));
+% end
 
 
 % --- Executes on button press in saveSpecRadio.
