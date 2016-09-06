@@ -408,7 +408,13 @@ classdef Andor < handle
                 CheckWarning(ret);
             end
             ret = SaveAsSif(file);
-            movefile('D',file);  %strange! SaveAsSif function because it save a file named D into the current folder; have to move it to the distination.
+            %strange! SaveAsSif function because it save a file named C or D into the current folder; have to move it to the distination.
+            if exist([pwd filesep 'D'],'file')
+                movefile('D',file);  
+            end
+            if exist([pwd filesep 'C'],'file')
+                movefile('C',file);
+            end
             CheckWarning(ret);
         end
         function acquireLive(Andor)   %

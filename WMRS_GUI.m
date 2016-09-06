@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 02-Sep-2016 15:03:52
+% Last Modified by GUIDE v2.5 06-Sep-2016 22:21:52
 
 % Begin initialization code - DO NOT EDIT
 
@@ -136,11 +136,12 @@ if Enable
     set(handles.save,'Enable','on');
     set(handles.saveSpecRadio,'Enable','on');
     set(handles.saveImgRadio,'Enable','on');
+    set(handles.saveBothRadio,'Enable','on');
     set(handles.open,'Enable','on');
     set(handles.fileName,'Enable','on');
     set(handles.pickRamanPeak,'Enable','on');
     set(handles.browserSpec,'Enable','on');
-    set(handles.browserImg,'Enable','on');
+%     set(handles.browserImg,'Enable','on');
     set(handles.laserMarker,'Enable','on');
     set(handles.englargerPlot,'Enable','on');
     set(handles.liveSpec,'Enable','on');
@@ -162,11 +163,12 @@ else
     set(handles.save,'Enable','off');
     set(handles.saveSpecRadio,'Enable','off');
     set(handles.saveImgRadio,'Enable','off');
+    set(handles.saveBothRadio,'Enable','off');
     set(handles.open,'Enable','off');
     set(handles.fileName,'Enable','off');
     set(handles.pickRamanPeak,'Enable','off');
     set(handles.browserSpec,'Enable','off');
-    set(handles.browserImg,'Enable','off');
+%     set(handles.browserImg,'Enable','off');
     set(handles.laserMarker,'Enable','off');
     set(handles.englargerPlot,'Enable','off');
     set(handles.liveSpec,'Enable','off');
@@ -246,12 +248,19 @@ set(handles.autoSuffix,'Value',fileOpt.autoSuffix);
 set(handles.isRealTimeImaging,'Value',0); acquireOpt.isRealTimeImaging = 0;
 set(handles.ramanPeak,'String',num2str(laser.ramanPeak));
 
-if fileOpt.saveOpt%save spectrum;
-    set(handles.saveSpecRadio,'Value',1);
-    set(handles.saveImgRadio,'Value',0);
-else
-    set(handles.saveSpecRadio,'Value',0);
-    set(handles.saveImgRadio,'Value',1);
+switch fileOpt.saveOpt
+    case 0 %save image
+        set(handles.saveSpecRadio,'Value',0);
+        set(handles.saveImgRadio,'Value',1);
+        set(handles.saveBothRadio,'Value',0);
+    case 1  %save spectrum;
+        set(handles.saveSpecRadio,'Value',1);
+        set(handles.saveImgRadio,'Value',0);
+        set(handles.saveBothRadio,'Value',0);
+    case 2 %save both;
+        set(handles.saveSpecRadio,'Value',0);
+        set(handles.saveImgRadio,'Value',0);
+        set(handles.saveBothRadio,'Value',1);
 end
 if ~isempty(fileOpt.fname)
     set(handles.fileName,'String',fileOpt.fname);
@@ -259,14 +268,15 @@ end
 if ~isempty(fileOpt.specFolder)
     set(handles.specFolder,'String',fileOpt.specFolder);
 end
-if ~isempty(fileOpt.imgFolder)
-    set(handles.imgFolder,'String',fileOpt.imgFolder);
-end  
+% if ~isempty(fileOpt.imgFolder)
+%     set(handles.imgFolder,'String',fileOpt.imgFolder);
+% end  
 axes(handles.specPlot);
 h = xlabel('Raman shift (nm)');
 pos = get(h,'pos'); % Read position [x y z]
 set(h,'pos',pos.*[1.085 1 1]) % Move label to right
-ylabel('Raman intensity (counts)');  
+ylabel('Raman intensity (counts)');
+dragzoom(handles.specPlot);
 
 %initialize camera; %current support only imagingSource USB cam;
 update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
@@ -293,6 +303,7 @@ end
 if ~isempty(vid)
     image = getdata(vid);
     axes(handles.imagePlot);
+    dragzoom(handles.imagePlot);
     hImage = imagesc(image);
     axis image;axis off;
     if ~isempty(laser.marker)
@@ -709,7 +720,7 @@ if isempty(acquireOpt.andor)
     update_waitbar(handles,0,'Andor is not initialized!',1);
     return;
 end
-if fileOpt.saveOpt %save spectra into sif file;    
+if fileOpt.saveOpt==1 || fileOpt.saveOpt == 2 %save spectra into sif file or both;    
     if fileOpt.autoSuffix
         suffix = str2num(fileOpt.fname(end-2:end));
         if isempty(suffix)
@@ -734,7 +745,9 @@ if fileOpt.saveOpt %save spectra into sif file;
         set(handles.fileName,'String',newfname);
         setUserData('fileOpt',fileOpt);
     end
-else  %save image
+end
+
+if fileOpt.saveOpt==0 || fileOpt.saveOpt == 2  %save image or both;
    %stop and take an image;
    if acquireOpt.isRealTimeImaging
        set(handles.isRealTimeImaging,'Value',0);
@@ -760,6 +773,9 @@ else  %save image
             end
         else
             fname = [fileOpt.imgFolder filesep fileOpt.fname '.tif'];
+        end
+        if exist(fileOpt.imgFolder,'dir') == 0
+            mkdir(fileOpt.imgFolder);
         end
         imwrite(acquireOpt.image,fname,'tif');
         update_waitbar(handles,0,sprintf('Current image have been save into tif file: %s.........',fname));
@@ -810,54 +826,55 @@ folderName = uigetdir(start_path,'Choose a spectra file path');
 if folderName ~= 0
     fileOpt.specFolder = folderName;
     set(handles.specFolder,'String',folderName); 
+    fileOpt.imgFolder = [folderName filesep 'Images'];     
     setUserData('fileOpt',fileOpt);
 end
     
 
 
 
-function imgFolder_Callback(hObject, eventdata, handles)
-% hObject    handle to imgFolder (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of imgFolder as text
-%        str2double(get(hObject,'String')) returns contents of imgFolder as a double
-
-
-% --- Executes during object creation, after setting all properties.
-function imgFolder_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to imgFolder (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-
-
-% --- Executes on button press in browserImg.
-function browserImg_Callback(hObject, eventdata, handles)
-% hObject    handle to browserImg (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-% acquireOpt = getUserData('acquireOpt');
-% laser = getUserData('laser');
-% spectrometer = getUserData('spectrometer');
-fileOpt = getUserData('fileOpt');
-if ~isempty(fileOpt.imgFolder)
-    start_path = fileOpt.imgFolder;
-else
-    start_path = pwd;
-end
-folderName = uigetdir(start_path,'Choose a spectra file path');
-if folderName ~= 0
-    fileOpt.imgFolder = folderName;
-    set(handles.imgFolder,'String',folderName); 
-    setUserData('fileOpt',fileOpt);
-end
+% function imgFolder_Callback(hObject, eventdata, handles)
+% % hObject    handle to imgFolder (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% 
+% % Hints: get(hObject,'String') returns contents of imgFolder as text
+% %        str2double(get(hObject,'String')) returns contents of imgFolder as a double
+% 
+% 
+% % --- Executes during object creation, after setting all properties.
+% function imgFolder_CreateFcn(hObject, eventdata, handles)
+% % hObject    handle to imgFolder (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    empty - handles not created until after all CreateFcns called
+% 
+% % Hint: edit controls usually have a white background on Windows.
+% %       See ISPC and COMPUTER.
+% if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+%     set(hObject,'BackgroundColor','white');
+% end
+% 
+% 
+% % --- Executes on button press in browserImg.
+% function browserImg_Callback(hObject, eventdata, handles)
+% % hObject    handle to browserImg (see GCBO)
+% % eventdata  reserved - to be defined in a future version of MATLAB
+% % handles    structure with handles and user data (see GUIDATA)
+% % acquireOpt = getUserData('acquireOpt');
+% % laser = getUserData('laser');
+% % spectrometer = getUserData('spectrometer');
+% fileOpt = getUserData('fileOpt');
+% if ~isempty(fileOpt.imgFolder)
+%     start_path = fileOpt.imgFolder;
+% else
+%     start_path = pwd;
+% end
+% folderName = uigetdir(start_path,'Choose a spectra file path');
+% if folderName ~= 0
+%     fileOpt.imgFolder = folderName;
+%     set(handles.imgFolder,'String',folderName); 
+%     setUserData('fileOpt',fileOpt);
+% end
 
 
 function fileName_Callback(hObject, eventdata, handles)
@@ -1195,8 +1212,8 @@ fileOpt = getUserData('fileOpt');
 spectrometer = getUserData('spectrometer');
 laser = getUserData('laser');
 
-if fileOpt.saveOpt %open spectra into plot;    
-    [FileName,PathName] = uigetfile([fileOpt.specFolder filesep '*.sif'],'Select spectrum file');
+if fileOpt.saveOpt == 1 || fileOpt.saveOpt == 2  %open spectra into plot or both;    
+    [FileName,PathName] = uigetfile([fileOpt.specFolder filesep '*.sif'],'Select a spectrum file');
     if FileName == 0 
         return;
     end
@@ -1231,8 +1248,9 @@ if fileOpt.saveOpt %open spectra into plot;
     setUserData('spectrometer',spectrometer);
     setUserData('acquireOpt',acquireOpt);
     update_waitbar(handles,0,sprintf('Load spectra from sif file: %s.........',fname));    
-else  %open image
-    [FileName,PathName] = uigetfile([fileOpt.specFolder filesep '*.tif'],'Select the MATLAB code file');
+end
+if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
+    [FileName,PathName] = uigetfile([fileOpt.specFolder filesep '*.tif'],'Select the tif image file');
     if FileName == 0 
         return;
     end
@@ -1409,7 +1427,9 @@ function saveSpecRadio_Callback(hObject, eventdata, handles)
 %laser = getUserData('laser');
 %spectrometer = getUserData('spectrometer');
 fileOpt = getUserData('fileOpt');
-fileOpt.saveOpt = get(hObject,'Value');
+if get(hObject,'Value')
+    fileOpt.saveOpt = 1;
+end
 setUserData('fileOpt',fileOpt);
 
 
@@ -1456,17 +1476,22 @@ end
 
 SetAllGUIButtons(handles,0);
 
-lambdamin=min(laser.start,laser.end);
-lambdamax=max(laser.start,laser.end);
+if laser.src == 1 %solstis    
+    lambdamin=min(laser.start(1),laser.end(1));
+    lambdamax=max(laser.start(1),laser.end(1));
+else %3900s
+    lambdamin=min(laser.start(2),laser.end(2));
+    lambdamax=max(laser.start(2),laser.end(2));
+end 
 if spectrometer.scans > 1 %WMRS
     set(handles.isWMRS,'Enable','on');
-    lambdaincr=lambdamax-lambdamin;%nm
+    lambdaincr=lambdamax-lambdamin;
     lambda = linspace(lambdamin,lambdamax,spectrometer.scans);
     acquireOpt.spectra = [];
     if laser.src == 1 %solstis
-        laser.counter = solstisWAVE(sol,laser.counter,lambdamin); %move to min wavelength;
+        laser.counter = solstisWAVE(laser.sol,laser.counter,lambdamin); %move to min wavelength;
     else %3900s
-        
+        laser.smc.moveTo(lambdamin); %move to min wavelengh
     end
     if laser.continuous %continuous tuning;
         if ad.ReadMode ~=0  %set to FVB mode;
@@ -1477,18 +1502,25 @@ if spectrometer.scans > 1 %WMRS
             ad.AcquisitionMode=3;
         end
         scantime = spectrometer.accums*spectrometer.exposureTime*spectrometer.scans;
+        if laser.src==0 %3900s;
+            smc.velocity = lambdaincr/scantime; %mm/s            
+        end
         [ret] = PrepareAcquisition();
         if ad.startAcquire == 1
-            tic;
-            while toc<scantime
-                lam=lambdamin+toc/scantime*lambdaincr;
-                laser.counter = solstisWAVE(sol, laser.counter, lam);
-                if toc/scantime<=1
-                    perc = toc/scantime;
-                else
-                    perc = 1;
+            if laser.src == 1 %solstis
+                tic;
+                while toc<scantime
+                    lam=lambdamin+toc/scantime*lambdaincr;
+                    laser.counter = solstisWAVE(laser.sol, laser.counter, lam);
+                    if toc/scantime<=1
+                        perc = toc/scantime;
+                    else
+                        perc = 1;
+                    end
+                    update_waitbar(handles,perc,sprintf('Tune wavelength to %5.3fnm.........Acquiring Raman spectrum...',lam));
                 end
-                update_waitbar(handles,perc,sprintf('Tune wavelength to %5.3fnm.........Acquiring Raman spectrum...',lam));
+            else %3900s
+                laser.smc.moveTo(lambdamax);
             end
             while ad.isAndorIdle~=1
                 %wait until acquisition finish;
@@ -1518,7 +1550,7 @@ if spectrometer.scans > 1 %WMRS
             if laser.src == 1 %solstis
                 laser.counter = solstisWAVE(laser.sol, laser.counter, lambda(mm));
             else %3900s
-                
+                laser.smc.moveTo(lambda(mm));
             end
             
             spec = [];cc=0;
@@ -1534,9 +1566,9 @@ if spectrometer.scans > 1 %WMRS
         end
     end
     if laser.src == 1 %solstis
-        laser.counter = solstisWAVE(sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
     else %3900s
-        
+        laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
     end
     if isempty(acquireOpt.spectra)
         acquireOpt.WMRSpectrum = [];
@@ -1565,9 +1597,9 @@ else %single spectra
         end
     end
     if laser.src == 1 %solstis
-        laser.counter = solstisWAVE(sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
     else %3900s
-        
+        laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
     end
     update_waitbar(handles,0,'Acquiring one spectrum.....');
     spectrometer.isWMRS = 0;
@@ -1751,3 +1783,17 @@ function SelectCam_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in saveBothRadio.
+function saveBothRadio_Callback(hObject, eventdata, handles)
+% hObject    handle to saveBothRadio (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of saveBothRadio
+fileOpt = getUserData('fileOpt');
+if get(hObject,'Value')
+    fileOpt.saveOpt=2; 
+end
+setUserData('fileOpt',fileOpt);
