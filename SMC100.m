@@ -54,6 +54,11 @@ classdef SMC100 < handle
                         continue;
                     end                    
                 end
+                if strcmp(obj.Status,'closed')
+                    SMC100.SMCobj = [];
+                    fprintf('No SMC controller has been connected....\n');
+                    return;
+                end
             else
                 obj = instrfind;
                 for m = 1:size(obj,2)
