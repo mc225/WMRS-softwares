@@ -1426,7 +1426,7 @@ if spectrometer.scans > 1 %WMRS
     lambda = linspace(lambdamin,lambdamax,spectrometer.scans);
     acquireOpt.spectra = [];
     if laser.src == 1 %solstis
-        laser.counter = solstisWAVE(sol,laser.counter,lambdamin); %move to min wavelength;
+        laser.counter = solstisWAVE(laser.sol,laser.counter,lambdamin); %move to min wavelength;
     else %3900s
         
     end
@@ -1444,7 +1444,7 @@ if spectrometer.scans > 1 %WMRS
             tic;
             while toc<scantime
                 lam=lambdamin+toc/scantime*lambdaincr;
-                laser.counter = solstisWAVE(sol, laser.counter, lam);
+                laser.counter = solstisWAVE(laser.sol, laser.counter, lam);
                 if toc/scantime<=1
                     perc = toc/scantime;
                 else
@@ -1496,7 +1496,7 @@ if spectrometer.scans > 1 %WMRS
         end
     end
     if laser.src == 1 %solstis
-        laser.counter = solstisWAVE(sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
     else %3900s
         
     end
@@ -1527,7 +1527,7 @@ else %single spectra
         end
     end
     if laser.src == 1 %solstis
-        laser.counter = solstisWAVE(sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
     else %3900s
         
     end
