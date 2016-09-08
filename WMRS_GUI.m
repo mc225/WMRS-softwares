@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 06-Sep-2016 22:21:52
+% Last Modified by GUIDE v2.5 08-Sep-2016 09:58:04
 
 % Begin initialization code - DO NOT EDIT
 
@@ -141,9 +141,9 @@ if Enable
     set(handles.fileName,'Enable','on');
     set(handles.pickRamanPeak,'Enable','on');
     set(handles.browserSpec,'Enable','on');
-%     set(handles.browserImg,'Enable','on');
+%     set(handles.CamExposSlider,'Enable','on');
+    set(handles.autoExposure,'Enable','on');
     set(handles.laserMarker,'Enable','on');
-    set(handles.englargerPlot,'Enable','on');
     set(handles.liveSpec,'Enable','on');
 else
     set(handles.laserSolstis,'Enable','off');
@@ -168,11 +168,12 @@ else
     set(handles.fileName,'Enable','off');
     set(handles.pickRamanPeak,'Enable','off');
     set(handles.browserSpec,'Enable','off');
-%     set(handles.browserImg,'Enable','off');
+%     set(handles.CamExposSlider,'Enable','off');
+    set(handles.autoExposure,'Enable','off');
     set(handles.laserMarker,'Enable','off');
-    set(handles.englargerPlot,'Enable','off');
     set(handles.liveSpec,'Enable','off');
 end
+
 %%%%%%%%%%%\
 
 %
@@ -191,6 +192,7 @@ clc;
 % Update handles structure
 guidata(hObject, handles);
 set(hObject, 'name', 'Wavelength Modulation Raman Spectroscopy (WMRS)');
+movegui(hObject,'center'); %move window to the center of screen;
 
 fname = [pwd filesep 'systemInit.mat'];
 if exist(fname,'file')
@@ -273,10 +275,10 @@ end
 % end  
 axes(handles.specPlot);
 h = xlabel('Raman shift (nm)');
-pos = get(h,'pos'); % Read position [x y z]
-set(h,'pos',pos.*[1.085 1 1]) % Move label to right
+% pos = get(h,'pos'); % Read position [x y z]
+% set(h,'pos',pos.*[1.085 1 1]) % Move label to right
 ylabel('Raman intensity (counts)');
-dragzoom(handles.specPlot);
+
 
 %initialize camera; %current support only imagingSource USB cam;
 update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
@@ -303,17 +305,22 @@ end
 if ~isempty(vid)
     image = getdata(vid);
     axes(handles.imagePlot);
-    dragzoom(handles.imagePlot);
     hImage = imagesc(image);
     axis image;axis off;
+    set(handles.CamExposSlider,'Min',0.0001,'Max',2,'SliderStep',[0.001 0.05]);
+    set(handles.CamExposSlider,'Value',src.Exposure);
+    src.ExposureAuto = 'On'; set(handles.CamExposSlider,'Enable','off');
+    set(handles.autoExposure,'Value',1);
     if ~isempty(laser.marker)
         x=laser.marker(1);y=laser.marker(2);
         h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 1 1]);
         laser.markerCross(1)=h;
         h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 1 1]);
         laser.markerCross(2)=h;
-    end
+    end    
 end
+
+dragzoom([handles.specPlot,handles.imagePlot]);
 
 acquireOpt.camera.vid = vid;
 acquireOpt.camera.src = src;
@@ -386,8 +393,6 @@ setUserData('spectrometer',spectrometer);
 update_waitbar(handles,0,'System is ready for use...........................');
 %Enable buttons
 SetAllGUIButtons(handles,1);
-
-
 set(hObject,'CloseRequestFcn',@closeApp);
 % UIWAIT makes WMRS_GUI wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
@@ -1113,8 +1118,8 @@ if ~isempty(acquireOpt.image)
         end
         laser.marker(1)=x;
         laser.marker(2)=y;
-        laser.markerCross(1)=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 1 1]);
-        laser.markerCross(2)=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 1 1]);
+        laser.markerCross(1)=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
+        laser.markerCross(2)=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
         setUserData('laser',laser);
         update_waitbar(handles,0,'Laser marker has been changed!');
     else
@@ -1491,7 +1496,9 @@ if spectrometer.scans > 1 %WMRS
     if laser.src == 1 %solstis
         laser.counter = solstisWAVE(laser.sol,laser.counter,lambdamin); %move to min wavelength;
     else %3900s
+        laser.smc.velocity = 0.1; %high speed;
         laser.smc.moveTo(lambdamin); %move to min wavelengh
+        pause(lambdaincr/0.1);%wait to position;
     end
     if laser.continuous %continuous tuning;
         if ad.ReadMode ~=0  %set to FVB mode;
@@ -1503,7 +1510,7 @@ if spectrometer.scans > 1 %WMRS
         end
         scantime = spectrometer.accums*spectrometer.exposureTime*spectrometer.scans;
         if laser.src==0 %3900s;
-            smc.velocity = lambdaincr/scantime; %mm/s            
+            laser.smc.velocity = lambdaincr/scantime; %mm/s            
         end
         [ret] = PrepareAcquisition();
         if ad.startAcquire == 1
@@ -1521,6 +1528,16 @@ if spectrometer.scans > 1 %WMRS
                 end
             else %3900s
                 laser.smc.moveTo(lambdamax);
+                last = 0;
+                while last<spectrometer.scans
+                    [ret, first,last] = GetNumberNewImages(); %use andor SDK function directly here, 
+                    if last == 0
+                        update_waitbar(handles,0,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Start aquiring Raman spectra...',lambdamin,lambdamax));
+                    else
+                        update_waitbar(handles,last/spectrometer.scans,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Acquiring %d Raman spectra...',lambdamin,lambdamax,last));
+                    end
+                    pause(spectrometer.exposureTime);
+                end
             end
             while ad.isAndorIdle~=1
                 %wait until acquisition finish;
@@ -1568,7 +1585,9 @@ if spectrometer.scans > 1 %WMRS
     if laser.src == 1 %solstis
         laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
     else %3900s
+        laser.smc.velocity = 0.1; %high speed;        
         laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
+        pause(lambdaincr/0.2); %wait to position;
     end
     if isempty(acquireOpt.spectra)
         acquireOpt.WMRSpectrum = [];
@@ -1627,9 +1646,10 @@ axes(axs);hold off;
 plot(axisWave,spec);
 axis tight;grid on;
 h = xlabel('Raman shift (nm)');
-pos = get(h,'pos'); % Read position [x y z]
-set(h,'pos',pos.*[1.085 1 1]) % Move label to right
+% pos = get(h,'pos'); % Read position [x y z]
+% set(h,'pos',pos.*[1.085 1 1]) % Move label to right
 ylabel('Raman intensity (counts)');
+dragzoom(axs);
 
 
 function v1 = calculateWMRspec(spec,ramanPk)
@@ -1728,26 +1748,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-% --- Executes on button press in englargerPlot.
-function englargerPlot_Callback(hObject, eventdata, handles)
-% hObject    handle to englargerPlot (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-acquireOpt = getUserData('acquireOpt');
-spectrometer = getUserData('spectrometer');
-figure(1000);h = gca;
-if spectrometer.isWMRS
-    if ~isempty(acquireOpt.WMRSpectrum)
-        updateWMRSpec(h,acquireOpt.andor.AxisWavelength,acquireOpt.WMRSpectrum);
-    end
-else
-    if ~isempty(acquireOpt.spectra)
-        updateWMRSpec(h,acquireOpt.andor.AxisWavelength,acquireOpt.spectra);
-    end
-end
-
-
 % --- Executes on button press in liveSpec.
 function liveSpec_Callback(hObject, eventdata, handles)
 % hObject    handle to liveSpec (see GCBO)
@@ -1797,3 +1797,53 @@ if get(hObject,'Value')
     fileOpt.saveOpt=2; 
 end
 setUserData('fileOpt',fileOpt);
+
+
+% --- Executes on slider movement.
+function CamExposSlider_Callback(hObject, eventdata, handles)
+% hObject    handle to CamExposSlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'Value') returns position of slider
+%        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
+acquireOpt = getUserData('acquireOpt'); 
+acquireOpt.camera.src.Exposure = get(hObject,'Value');
+setUserData('acquireOpt',acquireOpt);
+
+% --- Executes during object creation, after setting all properties.
+function CamExposSlider_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to CamExposSlider (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: slider controls usually have a light gray background.
+if isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor',[.9 .9 .9]);
+end
+ 
+
+
+% --- Executes on button press in autoExposure.
+function autoExposure_Callback(hObject, eventdata, handles)
+% hObject    handle to autoExposure (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of autoExposure
+acquireOpt = getUserData('acquireOpt');
+if get(hObject,'Value')
+    acquireOpt.camera.src.ExposureAuto = 'On';
+    set(handles.CamExposSlider,'Enable','off');    
+else
+    acquireOpt.camera.src.ExposureAuto = 'off';
+    acquireOpt.camera.src.Exposure = get(handles.CamExposSlider,'Value');
+    set(handles.CamExposSlider,'Enable','on');    
+end
+setUserData('acquireOpt',acquireOpt);
+
+% --- Executes during object creation, after setting all properties.
+function autoExposure_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to autoExposure (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called

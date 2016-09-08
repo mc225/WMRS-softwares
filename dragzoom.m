@@ -777,7 +777,7 @@ Initialize(varargin{:})
 %==========================================================================
     function SetFigureName()
         %SetFigureName Set Name of Figure
-        
+%         return; %don't do anything;
         enableStatus = 'off';
         if fIsEnabled
             enableStatus = 'on';
@@ -795,7 +795,7 @@ Initialize(varargin{:})
         
         newName = sprintf('[DRAGZOOM : "%s" (%s)]%s %s', ...
             enableStatus, syncMode, sep, mOrigFigName);
-        set(hFig, 'Name', newName)
+%         set(hFig, 'Name', newName)
     end
 %--------------------------------------------------------------------------
 
@@ -1637,7 +1637,7 @@ Initialize(varargin{:})
         %PointerCrossOn
         
         if ~fIsPointerCross
-            SetPointer('fullcrosshair');
+            SetPointer('crosshair');
             
             % text objects
             h = [
@@ -1717,12 +1717,12 @@ Initialize(varargin{:})
             [acx, acy] = GetCursorCoordOnAxes();
             
             left = mPointerCross.left;
-            right = mPointerCross.right;
+%             right = mPointerCross.right;
             bottom = mPointerCross.bottom;
-            top = mPointerCross.top;
+%             top = mPointerCross.top;
                         
             if fIsImage
-                xValStr = sprintf(' %d ', round(acx));
+                xValStr = sprintf('%d, %d', round(acx),round(acy));
                 yValStr = sprintf(' %d ', round(acy));
             else
                 xtick = get(hAx, 'XTick');
@@ -1763,28 +1763,28 @@ Initialize(varargin{:})
                     end
                 end
                 
-                xValStr = sprintf(' %.*g ', countDigX, acx);
+                xValStr = sprintf('X: %.*g, Y: %.*g', countDigX,acx,countDigY,acy);
                 yValStr = sprintf(' %.*g ', countDigY, acy);
             end
             
-            set(mPointerCross.htext(left), 'String', yValStr);
-            set(mPointerCross.htext(right), 'String', yValStr);
+%             set(mPointerCross.htext(left), 'String', yValStr);
+%             set(mPointerCross.htext(right), 'String', yValStr);
             set(mPointerCross.htext(bottom), 'String', xValStr);
-            set(mPointerCross.htext(top), 'String', xValStr);
+%             set(mPointerCross.htext(top), 'String', xValStr);
             
             extent = get(mPointerCross.htext(left), 'Extent');
-            xx = extent(3);
+%             xx = extent(3);
+            extent1 = get(mPointerCross.htext(bottom), 'Extent');
+%             if strcmp(get(hAx, 'xscale'), 'log') 
+%                 leftx =xlim(1);
+%             else
+%                 leftx = xlim(1) - xx;
+%             end
             
-            if strcmp(get(hAx, 'xscale'), 'log')
-                leftx = xlim(1);
-            else
-                leftx = xlim(1) - xx;
-            end
-            
-            set(mPointerCross.htext(left), 'Position', [leftx, acy]);
-            set(mPointerCross.htext(right), 'Position', [xlim(2) acy]);
-            set(mPointerCross.htext(bottom), 'Position', [acx, ylim(1)]);
-            set(mPointerCross.htext(top), 'Position', [acx, ylim(2)]);
+%             set(mPointerCross.htext(left), 'Position', [acx-2*extent(3), acy-extent(4)/2]);
+%             set(mPointerCross.htext(right), 'Position', [xlim(2) acy]);
+            set(mPointerCross.htext(bottom), 'Position', [acx-extent1(4)/2, acy+2*extent1(4)]);
+%             set(mPointerCross.htext(top), 'Position', [acx, ylim(2)]);
         end
     end
 %--------------------------------------------------------------------------

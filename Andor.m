@@ -90,6 +90,16 @@ classdef Andor < handle
                 CheckWarning(ret);
             end
             
+            % Initialize parameters;            
+            [ret, mintemp, maxtemp] = GetTemperatureRange();
+            CheckWarning(ret);
+            if nargin < 1
+                CCDSettingTemp = -70;   %CCD temperature at -70 Celsius by default;
+            elseif CCDSettingTemp<mintemp || CCDSettingTemp>maxtemp 
+                CCDSettingTemp = -70;
+            end
+            Andor.CCDSettingTemp = CCDSettingTemp;
+            
             fprintf('Initialising Shamrock... please wait!....');
             [ret] = ShamrockInitialize('');%initialization Shamrock grating;
             ShamrockCheckError(ret);
@@ -104,17 +114,7 @@ classdef Andor < handle
             [ret] = SetCropMode(0, 1, 0); CheckWarning(ret);
             [ret,XPixels, YPixels]=GetDetector; CheckWarning(ret);
             Andor.CCDsize = [XPixels, YPixels];
-            
-            % Initialize parameters;            
-            [ret, mintemp, maxtemp] = GetTemperatureRange();
-            CheckWarning(ret);
-            if nargin < 1
-                CCDSettingTemp = -70;   %CCD temperature at -70 Celsius by default;
-            elseif CCDSettingTemp<mintemp || CCDSettingTemp>maxtemp 
-                CCDSettingTemp = -70;
-            end
-            Andor.CCDSettingTemp = CCDSettingTemp;
-                        
+                                    
             if nargin<2
                 AcquisitionMode = 1;                          %AcquisitionMode,1 - Single Scan by default, 2 - Accumulate, 3 - Kinetics, 4 - Fast Kinetics, 5 - Run till abort;
             end
