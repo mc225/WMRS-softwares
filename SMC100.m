@@ -27,12 +27,13 @@ classdef SMC100 < handle
     methods
         function SMC100 = SMC100(COMport,velocity,minLimit,maxLimit,currentPos)            
             if nargin<1
-                obj = instrfind;
-                for m = 1:size(obj,2)
-                    if strcmp(obj(m).type,'serial')
-                        fclose(obj(m));
-                    end
-                end
+                %don't close opened port for other devices;
+%                 obj = instrfind;
+%                 for m = 1:size(obj,2)
+%                     if strcmp(obj(m).type,'serial')
+%                         fclose(obj(m));
+%                     end
+%                 end
                 a = instrhwinfo('serial');
                 if isempty(a.AvailableSerialPorts)
                     fprintf('No SMC controller has been connected....\n');
@@ -49,6 +50,10 @@ classdef SMC100 < handle
                         if isempty(status)
                             fprintf('Failed to open SMC controller on %s port!!!\n',COMport);
                             fclose(obj);
+                        else
+                            SMC100.SMCobj = obj;
+                            fprintf('SMC is detected and connected on port %s!!\n',COMport);
+                            break;
                         end
                     catch
                         continue;
@@ -83,19 +88,18 @@ classdef SMC100 < handle
                     fprintf('Cannot open SMC controller on %s port....please wait.....\n',COMport);
                 end
             end
-            status=query(obj,'1mm?');
+            
+            status=query(SMC100.SMCobj,'1mm?');
             if length(status)<5 %wrong com device
-                fclose(obj);
+                fclose(SMC100.SMCobj);
                 SMC100.SMCobj=[];
-                fprintf('No SMC controller has been connected!\n');
-                SMC100.SMCobj = [];
+                fprintf('Wrong SMC controller has been connected!\n');
                 return;
             else
                 if status(5) == '2'||status(5) == '3'|| status(5) == '4'
                     fprintf('SMC controller is open and ready on %s port!\n',COMport);
-                    SMC100.SMCobj = obj;
                 else
-                    fclose(obj);
+                    fclose(SMC100.SMCobj);
                     SMC100.SMCobj=[];
                     fprintf('SMC controller has not been connected correctly - code %d!\n',str2num(status(5)));
                     return;
@@ -161,12 +165,11 @@ classdef SMC100 < handle
     end
     methods(Access = private)
         function currentPos = setCurrentPosition(SMC100,newCurrentPos)
-%             if newCurrentPos<SMC100.minLimit
-%                 newCurrentPos = SMC100.minLimit;
-%             end
-%             if newCurrentPos>SMC100.maxLimit
-%                 newCurrentPos = SMC100.maxLimit;
-%             end
+            if newCurrentPos<SMC100.minLimit
+                newCurrentPos = SMC100.minLimit;                
+            elseif newCurrentPos>SMC100.maxLimit
+                newCurrentPos = SMC100.maxLimit;
+            end
             
             fprintf(SMC100.SMCobj,['1pa' num2str(newCurrentPos)]);
             

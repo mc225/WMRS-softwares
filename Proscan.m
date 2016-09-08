@@ -11,14 +11,15 @@ classdef Proscan < handle
 %         motorAcceleration;      %motor acceleration using for movement; range [1:150];  doesn't affect the movement a lot;
 %         umPerStep;              %one step in um, Read only;
 % Methods
-%     Move(Proscan,direction,steps)  %direction = 'B', 'F', 'L', 'R' (back, forward, left, right in direction);
-%     newPos = MoveTo(Proscan,position); % move to absolute positions
-%     JoystickEable(Proscan, OnOff); %Enable/disable joystick;
-%     EmergencyStop(Proscan); % emergency stop, immediately stop all movement and clear the command list.
-%     Stop(Proscan); %Stop in a controlled manner to reduce the risk of losing position. The command list in queue will be emptied;
-%     ReleaseProscan(Proscan);% relase COM obj
+%     move(Proscan,direction,steps)  %direction = 'B', 'F', 'L', 'R' (back, forward, left, right in direction);
+%     newPos = moveTo(Proscan,position); % move to absolute positions
+%     joystickEable(Proscan, OnOff); %Enable/disable joystick;
+%     emergencyStop(Proscan); % emergency stop, immediately stop all movement and clear the command list.
+%     stop(Proscan); %Stop in a controlled manner to reduce the risk of losing position. The command list in queue will be emptied;
+%     releaseProscan(Proscan);% relase COM obj
 %Example
 % pro = Proscan('COM4'); %stage is connected to COM4;    
+% pro = Proscan(); %Check all possible COM port to find the first connected Proscan stage;
 % Copyright @ Mingzhou Chen, @University of St. Andrews. Email: mingzhou.chen@st-andrews.ac.uk, August 2016, Ver. 1.00
 
 properties
@@ -40,34 +41,71 @@ properties
     
     methods
         function Proscan = Proscan(ComPort)
-            obj = instrfind('Type', 'serial', 'Port', ComPort, 'Tag', '');            
-            % Create the serial port object if it does not exist
-            % otherwise use the object that was found.
-            if isempty(obj)
-                obj = serial(ComPort);
+            if nargin<1
+                obj = instrfind;
+                %don't close opened port for other devices;
+%                 for m = 1:size(obj,2)
+%                     if strcmp(obj(m).type,'serial')
+%                         fclose(obj(m));
+%                     end
+%                 end
+                a = instrhwinfo('serial');
+                if isempty(a.AvailableSerialPorts)
+                    fprintf('No proscan COM port has been detected....\n');
+                    Proscan.stageObj = [];
+                    return;
+                end
+                
+                for m = 1:size(a.AvailableSerialPorts,1)
+                    COMport = cell2mat(a.AvailableSerialPorts(m));
+                    obj=serial(COMport,'Terminator', {'CR','CR'},'BaudRate', 9600,'DataBits', 8,'InputBufferSize', 2048,'OutputBufferSize', 2048,'Timeout', 1.0);
+                    fprintf('Open Proscan on %s port....please wait.....\n',COMport);
+                    try                        
+                        fopen(obj);
+                        fprintf(obj, 'SERIAL');
+                        sno= fscanf(obj, '%s\n');
+                        if isempty(sno)
+                            fprintf('Failed to connect ProScan on %s port!!!\n',COMport);
+                            fclose(obj);
+                        else
+                            Proscan.stageObj = obj;
+                            fprintf('ProScan stage is detected and connected on port %s!!\n',COMport);
+                            break;
+                        end
+                    catch
+                        continue;
+                    end                    
+                end
+                if strcmp(obj.Status,'closed')
+                    Proscan.stageObj = [];
+                    fprintf('No ProScan has been detected....\n');
+                    return;
+                end
             else
-                fclose(obj);
-                obj = obj(1);
-            end            
-            % Connect to instrument object, obj1.
-            set(obj, 'Terminator', {'CR','CR'},'BaudRate', 9600,'DataBits', 8,'InputBufferSize', 2048,'OutputBufferSize', 2048,'Timeout', 1.0);
-            fopen(obj);            
-            % Configure instrument object, obj1.            
+                obj = instrfind('Type', 'serial', 'Port', ComPort, 'Tag', '');
+                % Create the serial port object if it does not exist
+                if isempty(obj)
+                    obj = serial(ComPort);
+                else
+                    fclose(obj);
+                    obj = obj(1);
+                end
+                % Connect to instrument object, obj1.
+                set(obj, 'Terminator', {'CR','CR'},'BaudRate', 9600,'DataBits', 8,'InputBufferSize', 2048,'OutputBufferSize', 2048,'Timeout', 1.0);
+                fopen(obj);                
+                fprintf(obj, 'SERIAL');
+                sno= fscanf(obj, '%s\n');
+                if isempty(sno)
+                    fprintf('No ProScan stage is installed or connected on port %s!!\n',ComPort);
+                    fclose(obj);
+                    Proscan.stageObj = [];
+                    return;
+                else
+                    fprintf('ProScan stage is detected and connected on port %s!!\n',ComPort);
+                    Proscan.stageObj = obj;
+                end
+            end
             
-            %% Check stage serial
-            flushinput(obj); %clean the com buffer;
-            fprintf(obj, 'SERIAL');
-            sno= fscanf(obj, '%s\n');          
-            if isempty(sno)
-                fprintf('No Prior stage is installed or connected on %s!!\n',ComPort);
-                fclose(obj);
-                obj=[];
-                Proscan.stageObj = [];
-                return;
-            else
-                Proscan.stageObj = obj;
-            end         
-                        
             %% set to standard mode;
             flushinput(obj); %clean the com buffer;
             fprintf(obj, 'COMP,0');
@@ -76,7 +114,7 @@ properties
                 disp('Cannot set the stage in standard mode! Please check!');
             end
             %%
-            JoystickEable(Proscan, 1); %enable joystick;
+            joystickEable(Proscan, 1); %enable joystick;
             fprintf('Prior stage (serial No. %s) is ready for use now......\n',sno);
             fprintf('Current position [%d %d]. One unit step is %2.2f um.........\n',Proscan.currentPosition(1:2), Proscan.stepSize/Proscan.stageStepResoltion);
         end
@@ -122,7 +160,7 @@ properties
         
         %% routine functions
         % Move once (defined in property: stepsOneMovement)
-        function Move(Proscan,direction,steps)  %direction = 'B', 'F', 'L', 'R' (back, forward, left, right in direction);            
+        function move(Proscan,direction,steps)  %direction = 'B', 'F', 'L', 'R' (back, forward, left, right in direction);            
             if nargin<2
                 direction = 'B'; %backwards by default;
             end
@@ -162,7 +200,7 @@ properties
             end
         end
         % move to absolute positions
-        function newPos = MoveTo(Proscan,position)            
+        function newPos = moveTo(Proscan,position)            
             if length(position)<2
                 if Proscan.showMessage
                     disp('Need to input position in format of [x y]!');
@@ -213,7 +251,7 @@ properties
             end
         end
         % enable joystick
-        function JoystickEable(Proscan, OnOff) 
+        function joystickEable(Proscan, OnOff) 
             if OnOff
                 flushinput(Proscan.stageObj); %clean the com buffer;
                 fprintf(Proscan.stageObj, 'J');
@@ -231,7 +269,7 @@ properties
             end
         end    
         % emergency stop, immediately stop all movement and clear the command list.
-        function EmergencyStop(Proscan)
+        function emergencyStop(Proscan)
             flushinput(Proscan.stageObj); %clean the com buffer;
             fprintf(Proscan.stageObj, 'K');
             data = fscanf(Proscan.stageObj, '%s\n'); %in format [100,100];
@@ -240,7 +278,7 @@ properties
             end
         end
         % Stop in a controlled manner to reduce the risk of losing position. The command list in queue will be emptied;
-        function Stop(Proscan)
+        function stop(Proscan)
             flushinput(Proscan.stageObj); %clean the com buffer;
             fprintf(Proscan.stageObj, 'I');
             data = fscanf(Proscan.stageObj, '%s\n'); %in format [100,100];
@@ -249,7 +287,7 @@ properties
             end
         end
         % relase COM obj
-        function ReleaseProscan(Proscan)
+        function releaseProscan(Proscan)
             if ~isempty(ishandle(Proscan.stageObj))
                 fclose(Proscan.stageObj);
                 Proscan.stageObj = [];
