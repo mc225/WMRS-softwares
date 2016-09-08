@@ -1192,6 +1192,7 @@ else
         update_waitbar(handles,0,' ');
     end
 end
+dragzoom(handles.imagePlot);
 setUserData('acquireOpt',acquireOpt);
 % Hint: get(hObject,'Value') returns toggle state of isRealTimeImaging
 
