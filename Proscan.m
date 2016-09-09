@@ -163,8 +163,15 @@ properties
         function move(Proscan,direction,steps)  %direction = 'B', 'F', 'L', 'R' (back, forward, left, right in direction);            
             if nargin<2
                 direction = 'B'; %backwards by default;
+            else
+                if ~ischar(direction)
+                    disp('Please input in format of charater B, F, L or R. Now By default: B.');
+                    direction = 'B';
+                end
+                direction=upper(direction);
+                direction = direction(1);
             end
-            if isempty(strfind('BFLR',direction)) || length(direction)~=1
+            if isempty(strfind('BFLR',direction))
                 if Proscan.showMessage
                     disp('Please input in format of charater B, F, L or R. By default: B.');
                 end

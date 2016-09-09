@@ -313,9 +313,9 @@ if ~isempty(vid)
     set(handles.autoExposure,'Value',1);
     if ~isempty(laser.marker)
         x=laser.marker(1);y=laser.marker(2);
-        h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 1 1]);
+        h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
         laser.markerCross(1)=h;
-        h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 1 1]);
+        h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
         laser.markerCross(2)=h;
     end    
 end
@@ -1101,11 +1101,11 @@ function laserMarker_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 acquireOpt = getUserData('acquireOpt');
-acquireOpt.isRealTimeImaging = get(handles.isRealTimeImaging,'Value');
+% acquireOpt.isRealTimeImaging = get(handles.isRealTimeImaging,'Value');
 
 if ~isempty(acquireOpt.image)
     laser = getUserData('laser');
-    acquireOpt = getUserData('acquireOpt');
+%     acquireOpt = getUserData('acquireOpt');
     [x, y] = ginputax(handles.imagePlot,1);
     if gca == handles.imagePlot
         if ~isempty(laser.markerCross)
@@ -1288,9 +1288,9 @@ if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
             end
             if ~isempty(laser.marker)
                 x=laser.marker(1);y=laser.marker(2);
-                h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 1 1]);
+                h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
                 laser.markerCross(1)=h;
-                h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 1 1]);
+                h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
                 laser.markerCross(2)=h;
             end
             %refresh the laser cross marker, end
