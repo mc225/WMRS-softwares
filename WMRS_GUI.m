@@ -1374,8 +1374,16 @@ laser = getUserData('laser');
 if get(hObject,'Value')
     laser.src = 0; %3900s
 end
-set(handles.laserStart,'String',num2str(laser.start(2)));
-set(handles.laserEnd,'String',num2str(laser.end(2)));
+if length(laser.start)==2
+    set(handles.laserStart,'String',num2str(laser.start(2)));
+else
+    set(handles.laserStart,'String',num2str(16.3));
+end
+if length(laser.end)==2
+    set(handles.laserEnd,'String',num2str(laser.end(2)));
+else
+    set(handles.laserEnd,'String',num2str(16.45));
+end
 
 if isempty(laser.smc)
     smc = SMC100();
