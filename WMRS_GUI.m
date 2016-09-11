@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 08-Sep-2016 09:58:04
+% Last Modified by GUIDE v2.5 11-Sep-2016 22:13:32
 
 % Begin initialization code - DO NOT EDIT
 
@@ -286,6 +286,7 @@ try
     vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
 catch 
     vid = [];src = []; image = []; hImage = [];
+    axes(handles.imagePlot);axis off;
     warning('Camera is not connected!!');
 end
 if ~isempty(vid)
@@ -298,6 +299,7 @@ if ~isempty(vid)
         stop(vid);
         delete(vid);
         vid = []; src = [];    image = [];    hImage = [];
+        axes(handles.imagePlot);axis off;
         warning('Camera is occupied!!');
         update_waitbar(handles,0,'Camera is used by another application!!!',1);
     end
@@ -1856,3 +1858,59 @@ function autoExposure_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to autoExposure (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
+
+
+% --- Executes on button press in pushbutton21.
+function pushbutton21_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton21 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in pushbutton22.
+function pushbutton22_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton22 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in pushbutton23.
+function pushbutton23_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton23 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in pushbutton24.
+function pushbutton24_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton24 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in pickPoint.
+function pickPoint_Callback(hObject, eventdata, handles)
+% hObject    handle to pickPoint (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in calibStage.
+function calibStage_Callback(hObject, eventdata, handles)
+% hObject    handle to calibStage (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in clearCalibration.
+function clearCalibration_Callback(hObject, eventdata, handles)
+% hObject    handle to clearCalibration (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- Executes on button press in emergStop.
+function emergStop_Callback(hObject, eventdata, handles)
+% hObject    handle to emergStop (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
