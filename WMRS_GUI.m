@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 11-Sep-2016 22:13:32
+% Last Modified by GUIDE v2.5 13-Sep-2016 12:08:40
 
 % Begin initialization code - DO NOT EDIT
 
@@ -192,7 +192,6 @@ clc;
 % Update handles structure
 guidata(hObject, handles);
 set(hObject, 'name', 'Wavelength Modulation Raman Spectroscopy (WMRS)');
-movegui(hObject,'center'); %move window to the center of screen;
 
 fname = [pwd filesep 'systemInit.mat'];
 if exist(fname,'file')
@@ -274,9 +273,7 @@ end
 %     set(handles.imgFolder,'String',fileOpt.imgFolder);
 % end  
 axes(handles.specPlot);
-h = xlabel('Raman shift (nm)');
-% pos = get(h,'pos'); % Read position [x y z]
-% set(h,'pos',pos.*[1.085 1 1]) % Move label to right
+xlabel('Raman shift (nm)');
 ylabel('Raman intensity (counts)');
 
 
@@ -393,11 +390,12 @@ setUserData('fileOpt',fileOpt);
 setUserData('spectrometer',spectrometer);
 
 update_waitbar(handles,0,'System is ready for use...........................');
+movegui(hObject,'center'); %move window to the center of screen;
 %Enable buttons
 SetAllGUIButtons(handles,1);
 set(hObject,'CloseRequestFcn',@closeApp);
 % UIWAIT makes WMRS_GUI wait for user response (see UIRESUME)
-% uiwait(handles.figure1);
+% uiwait(handles.wmrs_figure);
 
 function closeApp(obj,event)
 %SaveAll training data
@@ -1157,9 +1155,9 @@ spectrometer.isWMRS = get(hObject,'Value');
 if ~isempty(acquireOpt.spectra)
     acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
     if spectrometer.isWMRS
-        updateWMRSpec(handles.specPlot,acquireOpt.andor.AxisWavelength,acquireOpt.WMRSpectrum);
+        updateWMRSpec(handles,acquireOpt.andor.AxisWavelength,acquireOpt.WMRSpectrum);
     else
-        updateWMRSpec(handles.specPlot,acquireOpt.andor.AxisWavelength,acquireOpt.spectra);
+        updateWMRSpec(handles,acquireOpt.andor.AxisWavelength,acquireOpt.spectra);
     end    
 end
 setUserData('spectrometer',spectrometer);
@@ -1194,9 +1192,7 @@ else
         update_waitbar(handles,0,' ');
     end
 end
-dragzoom(handles.imagePlot);
 setUserData('acquireOpt',acquireOpt);
-% Hint: get(hObject,'Value') returns toggle state of isRealTimeImaging
 
 
 % --- Executes on button press in autoSuffix.
@@ -1232,12 +1228,13 @@ if fileOpt.saveOpt == 1 || fileOpt.saveOpt == 2  %open spectra into plot or both
         return;
     end
     acquireOpt.spectra = squeeze(data.imageData);
+    AxisWavelength = data.axisWavelength;
     if size(acquireOpt.spectra,2)==1
         spectrometer.isWMRS = 0;
         set(handles.isWMRS,'Enable','off');
         set(handles.isWMRS,'Value',spectrometer.isWMRS);
         acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
-        updateWMRSpec(handles.specPlot,acquireOpt.andor.AxisWavelength,acquireOpt.spectra);
+        updateWMRSpec(handles,AxisWavelength,acquireOpt.spectra);
         update_waitbar(handles,0,' ');
     else
         if isempty(acquireOpt.spectra)
@@ -1248,9 +1245,9 @@ if fileOpt.saveOpt == 1 || fileOpt.saveOpt == 2  %open spectra into plot or both
         end
         set(handles.isWMRS,'Enable','on');
         if spectrometer.isWMRS
-            updateWMRSpec(handles.specPlot,acquireOpt.andor.AxisWavelength,acquireOpt.WMRSpectrum);
+            updateWMRSpec(handles,AxisWavelength,acquireOpt.WMRSpectrum);
         else
-            updateWMRSpec(handles.specPlot,acquireOpt.andor.AxisWavelength,acquireOpt.spectra);
+            updateWMRSpec(handles,AxisWavelength,acquireOpt.spectra);
         end
     end
     setUserData('spectrometer',spectrometer);
@@ -1279,6 +1276,7 @@ if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
         if ~isempty(acquireOpt.image)
             axes(handles.imagePlot);
             acquireOpt.hImage = imagesc(acquireOpt.image); axis image;axis off;
+            set(hImage,'ButtonDownFcn',@imagePlot_ButtonDownFcn);
             %refresh the laser cross marker
             if ~isempty(laser.markerCross)
                 if ishandle(laser.markerCross(1))
@@ -1607,9 +1605,9 @@ if spectrometer.scans > 1 %WMRS
         update_waitbar(handles,0,' ');
     end
     if spectrometer.isWMRS
-        updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.WMRSpectrum);
+        updateWMRSpec(handles,ad.AxisWavelength,acquireOpt.WMRSpectrum);
     else
-        updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.spectra);
+        updateWMRSpec(handles,ad.AxisWavelength,acquireOpt.spectra);
     end
     set(handles.isWMRS,'Enable','on');
 else %single spectra
@@ -1637,7 +1635,7 @@ else %single spectra
     set(handles.isWMRS,'Value',spectrometer.isWMRS);
     acquireOpt.spectra = ad.acquire0;
     acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
-    updateWMRSpec(handles.specPlot,ad.AxisWavelength,acquireOpt.spectra);
+    updateWMRSpec(handles,ad.AxisWavelength,acquireOpt.spectra);
     update_waitbar(handles,0,' ');
 end
 
@@ -1651,16 +1649,14 @@ setUserData('spectrometer',spectrometer);
 setUserData('acquireOpt',acquireOpt);
 setUserData('laser',laser);
 
-function updateWMRSpec(axs,axisWave,spec)
+function updateWMRSpec(handles,axisWave,spec)
 %update the plot spectra with new data;
-axes(axs);hold off;
+axes(handles.specPlot);hold off;
 plot(axisWave,spec);
 axis tight;grid on;
-h = xlabel('Raman shift (nm)');
-% pos = get(h,'pos'); % Read position [x y z]
-% set(h,'pos',pos.*[1.085 1 1]) % Move label to right
+xlabel('Raman shift (nm)');
 ylabel('Raman intensity (counts)');
-dragzoom(axs);
+dragzoom([handles.specPlot handles.imagePlot]);
 
 
 function v1 = calculateWMRspec(spec,ramanPk)
