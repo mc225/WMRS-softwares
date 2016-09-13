@@ -588,7 +588,7 @@ Initialize(varargin{:})
                 SetLinkAxesKeys(modifier);
             case 's'
                 % smooth plot
-                SetSmoothKeys();
+                % SetSmoothKeys(); %doesn't work; commented
         end
     end
 %--------------------------------------------------------------------------
