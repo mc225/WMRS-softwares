@@ -1181,7 +1181,7 @@ if acquireOpt.isRealTimeImaging
     if ~isempty(acquireOpt.camera.vid)        
         setappdata(acquireOpt.hImage,'UpdatePreviewWindowFcn',@mypreview_fcn);
         preview(acquireOpt.camera.vid, acquireOpt.hImage);
-        update_waitbar(handles,0,'Camera in preview mode....',1);
+        update_waitbar(handles,0,'Camera in preview mode....',1);        
     end
 else    
     if ~isempty(acquireOpt.camera.vid)  
@@ -1489,7 +1489,6 @@ else
     end
 end
 
-
 SetAllGUIButtons(handles,0);
 
 if laser.src == 1 %solstis    
@@ -1643,14 +1642,12 @@ else %single spectra
     update_waitbar(handles,0,' ');
 end
 
-
 SetAllGUIButtons(handles,1);
 if size(acquireOpt.spectra,2)==1
     set(handles.isWMRS,'Enable','off');
 end
 setUserData('acquireOpt',acquireOpt);
 setUserData('spectrometer',spectrometer);
-setUserData('acquireOpt',acquireOpt);
 setUserData('laser',laser);
 
 function updateWMRSpec(handles,axisWave,spec)
@@ -1660,7 +1657,8 @@ plot(axisWave,spec);
 axis tight;grid on;
 xlabel('Raman shift (nm)');
 ylabel('Raman intensity (counts)');
-dragzoom([handles.specPlot handles.imagePlot]);
+axes(handles.imagePlot);axis image;
+dragzoom([handles.imagePlot handles.specPlot]);
 
 
 function v1 = calculateWMRspec(spec,ramanPk)
