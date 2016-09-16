@@ -1818,6 +1818,13 @@ function CamExposSlider_Callback(hObject, eventdata, handles)
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 acquireOpt = getUserData('acquireOpt'); 
 acquireOpt.camera.src.Exposure = get(hObject,'Value');
+if get(hObject,'Min') == get(hObject,'Value')
+    acquireOpt.camera.src.GainAuto = 'Off'; %set auto Gain;
+    acquireOpt.camera.src.Gain = 34; %set Gain as minimum too;
+else
+    acquireOpt.camera.src.GainAuto = 'On'; %set auto Gain;
+end
+    
 setUserData('acquireOpt',acquireOpt);
 
 % --- Executes during object creation, after setting all properties.
