@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 13-Sep-2016 22:28:57
+% Last Modified by GUIDE v2.5 19-Sep-2016 23:35:41
 
 % Begin initialization code - DO NOT EDIT
 
@@ -1919,3 +1919,95 @@ function emergStop_Callback(hObject, eventdata, handles)
 % hObject    handle to emergStop (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+
+function stepSize_Callback(hObject, eventdata, handles)
+% hObject    handle to stepSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of stepSize as text
+%        str2double(get(hObject,'String')) returns contents of stepSize as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function stepSize_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to stepSize (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function stepSizeMicron_Callback(hObject, eventdata, handles)
+% hObject    handle to stepSizeMicron (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of stepSizeMicron as text
+%        str2double(get(hObject,'String')) returns contents of stepSizeMicron as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function stepSizeMicron_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to stepSizeMicron (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+
+function slitWidth_Callback(hObject, eventdata, handles)
+% hObject    handle to slitWidth (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of slitWidth as text
+%        str2double(get(hObject,'String')) returns contents of slitWidth as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function slitWidth_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to slitWidth (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in readMode.
+function readMode_Callback(hObject, eventdata, handles)
+% hObject    handle to readMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns readMode contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from readMode
+
+
+% --- Executes during object creation, after setting all properties.
+function readMode_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to readMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
