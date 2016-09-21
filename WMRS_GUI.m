@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 19-Sep-2016 23:35:41
+% Last Modified by GUIDE v2.5 20-Sep-2016 15:16:50
 
 % Begin initialization code - DO NOT EDIT
 
@@ -381,8 +381,16 @@ else % 3900s
         laser.smc = [];
         warning('SMC100 is not initialized successfully!');
     end
-    set(handles.laserStart,'String',num2str(laser.start(2)));
-    set(handles.laserEnd,'String',num2str(laser.end(2)));
+    if length(laser.start)>1
+        set(handles.laserStart,'String',num2str(laser.start(2)));
+    else
+        set(handles.laserStart,'String',num2str(16.30));%by default
+    end
+    if length(laser.end)>1
+        set(handles.laserEnd,'String',num2str(laser.end(2)));
+    else
+        set(handles.laserEnd,'String',num2str(16.45));%by default
+    end
 end 
 
 %set all user data;
@@ -1468,6 +1476,8 @@ function acquireSpec_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+modifiers = get(gcf,'currentModifier');
+ctrlIsPressed = ismember('control',modifiers); %Press Ctrl button in order to take the backgrond spectra;
 acquireOpt = getUserData('acquireOpt');
 laser = getUserData('laser');
 spectrometer = getUserData('spectrometer');
@@ -1865,30 +1875,30 @@ function autoExposure_CreateFcn(hObject, eventdata, handles)
 % handles    empty - handles not created until after all CreateFcns called
 
 
-% --- Executes on button press in pushbutton21.
-function pushbutton21_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton21 (see GCBO)
+% --- Executes on button press in stageMoveUp.
+function stageMoveUp_Callback(hObject, eventdata, handles)
+% hObject    handle to stageMoveUp (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 
-% --- Executes on button press in pushbutton22.
-function pushbutton22_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton22 (see GCBO)
+% --- Executes on button press in stageMoveRight.
+function stageMoveRight_Callback(hObject, eventdata, handles)
+% hObject    handle to stageMoveRight (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 
-% --- Executes on button press in pushbutton23.
-function pushbutton23_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton23 (see GCBO)
+% --- Executes on button press in stageMoveLeft.
+function stageMoveLeft_Callback(hObject, eventdata, handles)
+% hObject    handle to stageMoveLeft (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
 
-% --- Executes on button press in pushbutton24.
-function pushbutton24_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton24 (see GCBO)
+% --- Executes on button press in stageMoveDown.
+function stageMoveDown_Callback(hObject, eventdata, handles)
+% hObject    handle to stageMoveDown (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
@@ -2003,6 +2013,71 @@ function readMode_Callback(hObject, eventdata, handles)
 % --- Executes during object creation, after setting all properties.
 function readMode_CreateFcn(hObject, eventdata, handles)
 % hObject    handle to readMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+% --- Executes on button press in backSpecSubtraction.
+function backSpecSubtraction_Callback(hObject, eventdata, handles)
+% hObject    handle to backSpecSubtraction (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of backSpecSubtraction
+
+
+% --- Executes on button press in stageFlipLR.
+function stageFlipLR_Callback(hObject, eventdata, handles)
+% hObject    handle to stageFlipLR (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of stageFlipLR
+
+
+% --- Executes during object creation, after setting all properties.
+function stageFlipLR_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to stageFlipLR (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+
+% --- Executes on button press in stageFlipUD.
+function stageFlipUD_Callback(hObject, eventdata, handles)
+% hObject    handle to stageFlipUD (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of stageFlipUD
+
+
+% --- Executes on button press in stageRot90.
+function stageRot90_Callback(hObject, eventdata, handles)
+% hObject    handle to stageRot90 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of stageRot90
+
+
+% --- Executes on selection change in cameraSelect.
+function cameraSelect_Callback(hObject, eventdata, handles)
+% hObject    handle to cameraSelect (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns cameraSelect contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from cameraSelect
+
+
+% --- Executes during object creation, after setting all properties.
+function cameraSelect_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to cameraSelect (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
 
