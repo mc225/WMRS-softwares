@@ -103,7 +103,11 @@ fclose(f);
 %
 function info=readSection(f)
 o=fscanf(f,'%d',1);
-if o == 0 %testing if not data there.
+if o == 65567 %from new solis version >4.28
+    ver = 1;
+elseif o == 65566 %from old solis version <=4.28
+    ver = 0;
+else %testing if not data there.
     info = [];
     return;
 end
@@ -140,7 +144,11 @@ info.centerWavelength = o(4);
 info.grating = round(o(7));
 
 %skipLines(f,10); % added this in 
-skipUntil(f,'65539');
+if ver == 0 
+    skipUntil(f,'65539');
+else
+    skipUntil(f,'65540');
+end
 % skipUntilChar(f,'.');
 % backOneLine(f);
 
@@ -166,7 +174,11 @@ info.axisGHz = convertUnits(info.axisWavelength,'nm','GHz');
 %skipLines(f,6);
 switch pp
     case 0
-        skipUntil(f,'Wavelength');
+        if ver == 1
+            skipUntil(f,'Raman shift');
+        else
+            skipUntil(f,'Wavelength');
+        end
     case 1
         skipUntil(f,'Pixel number');
     case 2 
