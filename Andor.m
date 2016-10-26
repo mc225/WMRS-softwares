@@ -398,7 +398,7 @@ classdef Andor < handle
     methods
         function saveSIF(Andor,file,comment)
             [ret,gstatus]=AndorGetStatus();
-            CheckWarning(ret);
+            CheckWarning(ret);%
             if(gstatus ~= atmcd.DRV_IDLE)
                 disp('System is busy, please try it again later.');
                 return;
@@ -408,14 +408,16 @@ classdef Andor < handle
                 CheckWarning(ret);
             end
             ret = SaveAsSif(file);
-            %strange! SaveAsSif function because it save a file named C or D into the current folder; have to move it to the distination.
-            if exist([pwd filesep 'D'],'file')
-                movefile('D',file);  
-            end
-            if exist([pwd filesep 'C'],'file')
-                movefile('C',file);
-            end
             CheckWarning(ret);
+            
+            %strange! SaveAsSif function because it save a file named C or D into the current folder; have to move it to the distination.
+            movefile([pwd filesep file(1)],file); %alwasy save the filename as the first letter; need to move it to the distination;
+            
+            x = 1:Andor.CCD_Pixels(1);
+            B = [ones(1,Andor.CCD_Pixels(1));x;x.^2;x.^3].';
+            wavelengthInfo = pinv(B)*Andor.AxisWavelength;
+            newLine = sprintf('%4.12f %3.12f %3.12e %3.12e',wavelengthInfo);
+            replaceWavelengthInfoInSif(file,newLine); %add wavelength informatin into sif;
         end
         function acquireLive(Andor)   %
             fprintf('Starting live acquisition (Close the figure or press 0 to exit).......\n');            
@@ -650,7 +652,7 @@ classdef Andor < handle
         
     end
     
-    methods (Access = private)
+    methods (Access = private)        
         function CropHeight = setCropParam(Andor,newCropHeight)
             currentMode = Andor.ReadMode;
             if currentMode~=0; % only under FVB mode can set crop;
@@ -791,6 +793,53 @@ classdef Andor < handle
             ShamrockCheckWarning(ret);
         end        
     end    
+end
+
+function ret = replaceWavelengthInfoInSif(siffile,newLine)
+%replace one line in the sif file;
+
+% Read all into cell A
+fid = fopen(siffile,'r');
+ret = 1;
+if fid == -1
+    warning(sprintf('Cannot open file: %s',siffile));
+    ret = 0;
+    return;
+end
+
+str = '65540';
+ls = length(str);
+strFound = 0;
+str2 = 'Pixel number6';
+ls2 = length(str2);
+pix = 0;
+i = 1;
+tline = fgetl(fid);
+A{i} = tline;
+while ischar(tline)
+    i = i+1;
+    tline = fgetl(fid);
+    if length(tline)>=ls && strcmp(tline(1:ls), str) && strFound<2% find string;
+        repline = i+1;
+        strFound = strFound+1;
+    end
+    if length(tline)>=ls2 && strcmp(tline(1:ls2), str2) && ~pix % find string;
+        repline2 = i;
+        pix = 1; 
+    end
+    
+    A{i} = tline;
+end
+fclose(fid);
+
+% Change cell A
+A{repline} = sprintf('%s',newLine);
+A{repline2} = sprintf('%s','Wavelength6');
+%save all back into the file;
+
+fid = fopen(siffile, 'w');
+fprintf(fid, '%s\n', A{:});
+fclose(fid);
 end
 
 function txt = myupdatefcn(~,event_obj)

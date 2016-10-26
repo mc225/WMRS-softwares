@@ -174,11 +174,7 @@ info.axisGHz = convertUnits(info.axisWavelength,'nm','GHz');
 %skipLines(f,6);
 switch pp
     case 0
-        if ver == 1
-            skipUntil(f,'Raman shift');
-        else
-            skipUntil(f,'Wavelength');
-        end
+        skipUntil(f,'Wavelength');
     case 1
         skipUntil(f,'Pixel number');
     case 2 
