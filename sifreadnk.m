@@ -133,6 +133,11 @@ info.detectorType=readLine(f);
 %info.whatisthis=readLine(f)
 info.detectorSize=fscanf(f,'%d',[1 2]); %% I think everythings ok to here
 info.fileName=readString(f);
+sifFromSDK = 0;
+if strcmp(info.fileName,'Acquisition')
+    sifFromSDK = 1;
+end
+    
 %skipLines(f,4); %% changed this from 26 from Ixon camera now works for Newton. %%%%%%%%%%%%%%%%%%%%%%% ALL YOU NEED TO CHANGE
 
 skipUntil(f,'65538')
@@ -172,29 +177,56 @@ info.axisEnergy = convertUnits(info.axisWavelength,'nm','eV'); % energy in eV
 info.axisGHz = convertUnits(info.axisWavelength,'nm','GHz');
 
 %skipLines(f,6);
-switch pp
-    case 0
-        skipUntil(f,'Wavelength');
-    case 1
-        skipUntil(f,'Pixel number');
-    case 2 
-        skipUntil(f,'Raman shift');
-    otherwise
-        skipLines(f,6);
+if ver%new version
+    skipLines(f,3);
+    o=fscanf(f,'%f',1);
+    info.laserLine = o(1);
+    skipLines(f,4);
+    tp=fscanf(f,'%f',1);
+    switch tp
+        case 10
+            info.frameAxis = 'Wavelength (nm)';
+            skipUntil(f,'Wavelength');
+        case 11
+            info.frameAxis = 'Raman shift (cm^{-1})';
+            skipUntil(f,'Raman shift');
+            info.axisWavelength = (1/info.laserLine-1./info.axisWavelength).*10^7;
+        case 12
+            if sifFromSDK
+                info.frameAxis = 'Wavelength (nm)';
+            else
+                info.frameAxis = 'Pixel number';
+            end
+            skipUntil(f,'Pixel number');
+        otherwise
+            info.frameAxis = 'Pixel number';
+    end
+    backOneLine(f);
+    backOneLine(f);
+    readString(f); %'Pixel number' 
+else
+    switch pp
+        case 0
+            skipUntil(f,'Wavelength');
+        case 1
+            skipUntil(f,'Pixel number');
+        case 2
+            skipUntil(f,'Raman shift');
+        otherwise
+            skipLines(f,6);
+    end
+    backOneLine(f);
+    backOneLine(f);
+    info.frameAxis=readString(f); %'Pixel number' 
+    if strcmp(info.frameAxis,'Wavelength')
+        info.frameAxis = 'Wavelength (nm)';
+    elseif strcmp(info.frameAxis,'Raman shift')
+        info.frameAxis = 'Raman shift (cm^{-1})';
+    elseif strcmp(info.frameAxis,'Pixel number')
+        info.frameAxis = 'Pixel number';
+    end
 end
 
-backOneLine(f)
-backOneLine(f)
-
-
-info.frameAxis=readString(f); %'Pixel number' 
-if strcmp(info.frameAxis,'Wavelength')
-    info.frameAxis = 'Wavelength (nm)';
-elseif strcmp(info.frameAxis,'Raman shift')
-    info.frameAxis = 'Raman shift (cm^{-1})';
-elseif strcmp(info.frameAxis,'Pixel number')
-    info.frameAxis = 'Pixel number';
-end
 info.dataType=readString(f);  %'Counts' %% gets this from andor file
 info.imageAxis=readString(f);  %'Pixel number' %% gets this from andor file
 o=fscanf(f,'65541 %d %d %d %d %d %d %d %d 65538 %d %d %d %d %d %d',14); %% 14 is lines in o?

@@ -798,48 +798,36 @@ end
 function ret = replaceWavelengthInfoInSif(siffile,newLine)
 %replace one line in the sif file;
 
-% Read all into cell A
-fid = fopen(siffile,'r');
+%read out all data from sif
+FID = fopen(siffile, 'r');
 ret = 1;
-if fid == -1
+if FID == -1
     warning(sprintf('Cannot open file: %s',siffile));
     ret = 0;
     return;
 end
+Data = textscan(FID, '%s', 'delimiter', '\n', 'whitespace', '');
+CStr = Data{1};
+fclose(FID);
 
-str = '65540';
-ls = length(str);
-strFound = 0;
-str2 = 'Pixel number6';
-ls2 = length(str2);
-pix = 0;
-i = 1;
-tline = fgetl(fid);
-A{i} = tline;
-while ischar(tline)
-    i = i+1;
-    tline = fgetl(fid);
-    if length(tline)>=ls && strcmp(tline(1:ls), str) && strFound<2% find string;
-        repline = i+1;
-        strFound = strFound+1;
-    end
-    if length(tline)>=ls2 && strcmp(tline(1:ls2), str2) && ~pix % find string;
-        repline2 = i;
-        pix = 1; 
-    end
-    
-    A{i} = tline;
+searchSt1 = '65540'; %lines before data;
+
+IndexC = strfind(CStr, searchSt1);
+Index1 = find(~cellfun('isempty', IndexC), 1,'last')+1;
+
+if ~isempty(Index1)
+    CStr(Index1) = mat2cell(newLine,1);
 end
-fclose(fid);
 
-% Change cell A
-A{repline} = sprintf('%s',newLine);
-A{repline2} = sprintf('%s','Wavelength6');
-%save all back into the file;
-
-fid = fopen(siffile, 'w');
-fprintf(fid, '%s\n', A{:});
-fclose(fid);
+% Save the file again:
+FID = fopen(siffile, 'w');
+if FID == -1
+    warning(sprintf('Cannot open file: %s',siffile));
+    ret = 0;
+    return;
+end
+fprintf(FID, '%s\n', CStr{:});
+fclose(FID);
 end
 
 function txt = myupdatefcn(~,event_obj)
