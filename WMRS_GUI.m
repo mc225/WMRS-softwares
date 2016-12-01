@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 20-Sep-2016 15:16:50
+% Last Modified by GUIDE v2.5 01-Dec-2016 15:00:56
 
 % Begin initialization code - DO NOT EDIT
 
@@ -119,11 +119,8 @@ value = userData.(fieldName);
 
 function SetAllGUIButtons(handles,Enable)
 if Enable
-    set(handles.laserSolstis,'Enable','on');
-    set(handles.laser3900s,'Enable','on');
     set(handles.laserStart,'Enable','on');
     set(handles.laserEnd,'Enable','on');
-    set(handles.continuousMod,'Enable','on');
     set(handles.exposureTime,'Enable','on');
     set(handles.scans,'Enable','on');
     set(handles.accums,'Enable','on');
@@ -145,12 +142,14 @@ if Enable
     set(handles.autoExposure,'Enable','on');
     set(handles.laserMarker,'Enable','on');
     set(handles.liveSpec,'Enable','on');
-else
-    set(handles.laserSolstis,'Enable','off');
-    set(handles.laser3900s,'Enable','off');
+    set(handles.signalBackRef,'Enable','on');    
+    set(handles.modulationMode,'Enable','on');  
+    set(handles.slitWidth,'Enable','on'); 
+    set(handles.readMode,'Enable','on'); 
+    set(handles.laserSource,'Enable','on'); 
+else    
     set(handles.laserStart,'Enable','off');
     set(handles.laserEnd,'Enable','off');
-    set(handles.continuousMod,'Enable','off');
     set(handles.exposureTime,'Enable','off');
     set(handles.scans,'Enable','off');
     set(handles.accums,'Enable','off');
@@ -172,6 +171,11 @@ else
     set(handles.autoExposure,'Enable','off');
     set(handles.laserMarker,'Enable','off');
     set(handles.liveSpec,'Enable','off');
+    set(handles.signalBackRef,'Enable','off');    
+    set(handles.modulationMode,'Enable','off'); 
+    set(handles.slitWidth,'Enable','off'); 
+    set(handles.readMode,'Enable','off'); 
+    set(handles.laserSource,'Enable','off'); 
 end
 
 %%%%%%%%%%%\
@@ -217,6 +221,9 @@ else
     spectrometer.cropHeight = 256;
     spectrometer.centralWavelength = 924.1050; %nm;
     spectrometer.isWMRS = 0; %by default, show original spectra;
+    spectrometer.slitWidth = 150; %by default, set slit width of spectrometer 150um;
+    spectrometer.readMode = 0; %by default, Set spectrometer FVB mode;
+    
     
     %init fileOpt
     fileOpt.saveOpt = 1; %save spectrum;
@@ -228,24 +235,21 @@ end
 %init acquireOpt %will not be saved when quit.
 acquireOpt.image = [];
 acquireOpt.spectra = [];
+acquireOpt.background = [];
 acquireOpt.WMRSpectrum = [];
 acquireOpt.andor = [];
 acquireOpt.camera = [];
 acquireOpt.isRealTimeImaging = 0;
 acquireOpt.axisWavelength = [];
+acquireOpt.signalBackRef = 0;
 
 %disable buttons
 SetAllGUIButtons(handles,0);
 
 %init all GUI components;
 set(handles.laserStart,'String',num2str(laser.start)); 
-set(handles.laserEnd,'String',num2str(laser.end)); 
-set(handles.continuousMod,'Value',laser.continuous);
-set(handles.exposureTime,'String',num2str(spectrometer.exposureTime));
-set(handles.scans,'String',num2str(spectrometer.scans));
-set(handles.accums,'String',num2str(spectrometer.accums));
-set(handles.cropHeight,'String',num2str(spectrometer.cropHeight));
-set(handles.centralWavelength,'String',num2str(spectrometer.centralWavelength));
+set(handles.laserEnd,'String',num2str(laser.end));
+set(handles.modulationMode,'Value',laser.continuous+1);
 set(handles.isWMRS,'Value',spectrometer.isWMRS);set(handles.isWMRS,'Enable','off');
 set(handles.autoSuffix,'Value',fileOpt.autoSuffix);
 set(handles.isRealTimeImaging,'Value',0); acquireOpt.isRealTimeImaging = 0;
@@ -347,7 +351,12 @@ if ~isempty(ad)
     ad.ExposureTime = spectrometer.exposureTime;
     ad.NumberAccumulations = spectrometer.accums;
     ad.NumberKinetics = spectrometer.scans;
-    ad.ReadMode = 0;  %set to FVB mode;
+    if ad.ReadMode ~= spectrometer.readMode
+        ad.ReadMode = spectrometer.readMode;  %set to FVB mode;
+    end
+    if ad.SlitWidth ~= spectrometer.slitWidth 
+        ad.SlitWidth = spectrometer.slitWidth; %set slitWidth;
+    end
     ad.AcquisitionMode = 1; %single scan;
     ad.CropHeight = spectrometer.cropHeight;
     if abs(ad.CentralWavelength-spectrometer.centralWavelength)>0.0005
@@ -356,6 +365,19 @@ if ~isempty(ad)
 end
 acquireOpt.andor = ad;
 
+%set GUIs;
+set(handles.exposureTime,'String',num2str(spectrometer.exposureTime));
+set(handles.scans,'String',num2str(spectrometer.scans));
+set(handles.accums,'String',num2str(spectrometer.accums));
+set(handles.cropHeight,'String',num2str(spectrometer.cropHeight));
+set(handles.centralWavelength,'String',num2str(spectrometer.centralWavelength));
+set(handles.slitWidth,'String',num2str(spectrometer.slitWidth));
+if spectrometer.readMode == 0
+    set(handles.slitWidth,'Value',1);
+elseif spectrometer.readMode == 4
+    set(handles.slitWidth,'Value',2);
+else
+end
 %initialize laser;
 if laser.src == 1 % SolsTis;
     update_waitbar(handles,0,'Initializing Solstis.............Please wait......',1);
@@ -367,16 +389,14 @@ if laser.src == 1 % SolsTis;
     else
         update_waitbar(handles,0,'No successful connection to Solstis!!!',1);
     end
-    set(handles.laserSolstis,'Value',1);
-    set(handles.laser3900s,'Value',0);
+    set(handles.laserSource,'Value',2); %set Solstis;
     set(handles.laserStart,'String',num2str(laser.start(1)));
     set(handles.laserEnd,'String',num2str(laser.end(1)));
 else % 3900s
     smc = SMC100();    
     if ~isempty(smc.SMCobj)
         laser.smc = smc;
-        set(handles.laserSolstis,'Value',0);
-        set(handles.laser3900s,'Value',1);
+        set(handles.laserSource,'Value',1); %set 3900s;
     else
         laser.smc = [];
         warning('SMC100 is not initialized successfully!');
@@ -938,29 +958,6 @@ if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgr
     set(hObject,'BackgroundColor','white');
 end
 
-
-% --- Executes on button press in continuousMod.
-function continuousMod_Callback(hObject, eventdata, handles)
-% hObject    handle to continuousMod (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of continuousMod
-%acquireOpt = getUserData('acquireOpt');
-laser = getUserData('laser');
-%spectrometer = getUserData('spectrometer');
-%fileOpt = getUserData('fileOpt');
-laser.continuous = get(hObject,'Value');
-setUserData('laser',laser);
-if laser.continuous
-    str = 'Modulation mode has been set to continous-tuning!'; 
-else
-    str = 'Modulation mode has been set to step-tuning!'; 
-end
-update_waitbar(handles,0,str);
-
-
-
 function laserStart_Callback(hObject, eventdata, handles)
 % hObject    handle to laserStart (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -1093,16 +1090,6 @@ function laserEnd_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
-% --- Executes on button press in continuousMod.
-function checkbox2_Callback(hObject, eventdata, handles)
-% hObject    handle to continuousMod (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of laserMark
-
 
 % --- Executes on button press in laserMarker.
 function laserMarker_Callback(hObject, eventdata, handles)
@@ -1314,131 +1301,11 @@ if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
 end
 
 
-% --- Executes on button press in laserSolstis.
-function laserSolstis_Callback(hObject, eventdata, handles)
-% hObject    handle to laserSolstis (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of laserSolstis
-%acquireOpt = getUserData('acquireOpt');
-laser = getUserData('laser');
-%spectrometer = getUserData('spectrometer');
-%fileOpt = getUserData('fileOpt');
-if get(hObject,'Value')
-    laser.src = 1;
-end
-update_waitbar(handles,0,'Select Solstis as laser source now.');
-
-set(handles.laserStart,'String',num2str(laser.start(1)));
-set(handles.laserEnd,'String',num2str(laser.end(1)));
-
-if isempty(laser.sol)
-    update_waitbar(handles,0,'Initializing Solstis.............Please wait......');
-    [sol,ii]=solstisINI();
-    laser.sol = sol;
-    laser.counter = ii;
-    if isempty(laser.sol)
-        update_waitbar(handles,0,'No successful connection to Solstis!!!',1);
-        return;
-    end
-end
-
-if ~isempty(laser.sol)
-    laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start(1)+laser.end(1))/2); %move to the middle position;
-    update_waitbar(handles,0,sprintf('Laser has been tuned to %3.1fnm',(laser.start(1)+laser.end(1))/2));
-else
-    update_waitbar(handles,0,'No successful connection to Solstis!!!',1);
-    warning('No connection to Solstis!!');
-end
-setUserData('laser',laser);
-
-
-
 % --------------------------------------------------------------------
 function uibuttongroup3_ButtonDownFcn(hObject, eventdata, handles)
 % hObject    handle to uibuttongroup3 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
-
-% --- If Enable == 'on', executes on mouse press in 5 pixel border.
-% --- Otherwise, executes on mouse press in 5 pixel border or over laser3900s.
-function laser3900s_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to laser3900s (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-
-% --- Executes on button press in laser3900s.
-function laser3900s_Callback(hObject, eventdata, handles)
-% hObject    handle to laser3900s (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of laser3900s
-%acquireOpt = getUserData('acquireOpt');
-laser = getUserData('laser');
-%spectrometer = getUserData('spectrometer');
-%fileOpt = getUserData('fileOpt');
-if get(hObject,'Value')
-    laser.src = 0; %3900s
-end
-if length(laser.start)==2
-    set(handles.laserStart,'String',num2str(laser.start(2)));
-else
-    set(handles.laserStart,'String',num2str(16.3));
-end
-if length(laser.end)==2
-    set(handles.laserEnd,'String',num2str(laser.end(2)));
-else
-    set(handles.laserEnd,'String',num2str(16.45));
-end
-
-if isempty(laser.smc)
-    smc = SMC100();
-    if ~isempty(smc.SMCobj)
-        laser.smc = smc;
-        update_waitbar(handles,0,'3900s is selected as laser source now.');
-    else
-        laser.smc = [];
-        update_waitbar(handles,0,'SMC100 cannot be initialized successfully!',1);
-    end    
-    setUserData('laser',laser);
-else %Check smc status;
-    try
-        status=query(laser.smc.SMCobj,'1mm?');
-    catch
-        if ~isempty(laser.smc.SMCobj)
-            laser.smc.releaseSMC();
-        end
-        laser.smc = [];
-        update_waitbar(handles,0,'SMC100 has been disconnected, retry!');
-        setUserData('laser',laser);
-        return;
-    end
-    if length(status)<5 %wrong com device
-        if ~isempty(laser.smc.SMCobj)
-            laser.smc.releaseSMC();
-        end
-        laser.smc = [];
-        update_waitbar(handles,0,'SMC100 has been disconnected!');
-    elseif status(5) == '2'||status(5) == '3'|| status(5) == '4'
-        update_waitbar(handles,0,'3900s is selected as laser source now.');
-    else
-        if ~isempty(laser.smc.SMCobj)
-            laser.smc.releaseSMC();
-        end
-        laser.smc = [];
-        update_waitbar(handles,0,'SMC100 is wrong, please check!');
-    end
-    setUserData('laser',laser);
-end
-%  if ~isempty(laser.smc)
-%     laser.smc.moveTo((laser.start(2)+laser.end(2))/2);
-%     update_waitbar(handles,0,sprintf('SMC has been tuned to %2.4fnm',(laser.start(2)+laser.end(2))/2));
-% end
-
 
 % --- Executes on button press in saveSpecRadio.
 function saveSpecRadio_Callback(hObject, eventdata, handles)
@@ -1508,11 +1375,15 @@ else %3900s
     lambdamin=min(laser.start(2),laser.end(2));
     lambdamax=max(laser.start(2),laser.end(2));
 end 
-if spectrometer.scans > 1 %WMRS
+if ctrlIsPressed %take the background;
+    acquireOpt.background = [];
+else
+    acquireOpt.spectra = [];
+end
+if spectrometer.scans > 1 %may WMRS
     set(handles.isWMRS,'Enable','on');
     lambdaincr=lambdamax-lambdamin;
     lambda = linspace(lambdamin,lambdamax,spectrometer.scans);
-    acquireOpt.spectra = [];
     if laser.src == 1 %solstis
         laser.counter = solstisWAVE(laser.sol,laser.counter,lambdamin); %move to min wavelength;
     else %3900s
@@ -1520,7 +1391,7 @@ if spectrometer.scans > 1 %WMRS
         laser.smc.moveTo(lambdamin); %move to min wavelengh
         pause(lambdaincr/0.1);%wait to position;
     end
-    if laser.continuous %continuous tuning;
+    if laser.continuous == 1 %continuous tuning;
         if ad.ReadMode ~=0  %set to FVB mode;
             update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
             ad.ReadMode=0;
@@ -1532,7 +1403,6 @@ if spectrometer.scans > 1 %WMRS
         if laser.src==0 %3900s;
             laser.smc.velocity = lambdaincr/scantime; %mm/s            
         end
-        [ret] = PrepareAcquisition();
         if ad.startAcquire == 1
             if laser.src == 1 %solstis
                 tic;
@@ -1544,7 +1414,11 @@ if spectrometer.scans > 1 %WMRS
                     else
                         perc = 1;
                     end
-                    update_waitbar(handles,perc,sprintf('Tune wavelength to %5.3fnm.........Acquiring Raman spectrum...',lam));
+                    if ctrlIsPressed %take the background;
+                        update_waitbar(handles,perc,sprintf('Tune wavelength to %5.3fnm.........Acquiring background Raman spectrum...',lam));
+                    else
+                        update_waitbar(handles,perc,sprintf('Tune wavelength to %5.3fnm.........Acquiring Raman spectrum...',lam));
+                    end
                 end
             else %3900s
                 laser.smc.moveTo(lambdamax);
@@ -1552,22 +1426,39 @@ if spectrometer.scans > 1 %WMRS
                 while last<spectrometer.scans
                     [ret, first,last] = GetNumberNewImages(); %use andor SDK function directly here, 
                     if last == 0
-                        update_waitbar(handles,0,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Start aquiring Raman spectra...',lambdamin,lambdamax));
+                        if ctrlIsPressed %take the background;
+                            update_waitbar(handles,0,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Start aquiring background Raman spectra...',lambdamin,lambdamax));
+                        else
+                            update_waitbar(handles,0,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Start aquiring Raman spectra...',lambdamin,lambdamax));
+                        end
                     else
-                        update_waitbar(handles,last/spectrometer.scans,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Acquiring %d Raman spectra...',lambdamin,lambdamax,last));
+                        if ctrlIsPressed %take the background;
+                            update_waitbar(handles,last/spectrometer.scans,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Acquiring %d background Raman spectra...',lambdamin,lambdamax,last));
+                        else
+                            update_waitbar(handles,last/spectrometer.scans,sprintf('Tunning SMC from %2.4fmm to %2.4fmm.........Acquiring %d Raman spectra...',lambdamin,lambdamax,last));
+                        end
                     end
-                    pause(spectrometer.exposureTime);
+                    pause(spectrometer.accums*spectrometer.exposureTime);
                 end
             end
             while ad.isAndorIdle~=1
                 %wait until acquisition finish;
             end
-            acquireOpt.spectra=(ad.getImage).';
+            if ctrlIsPressed %take the background;
+                acquireOpt.background=(ad.getImage).';
+            else
+                acquireOpt.spectra=(ad.getImage).';
+            end
         else
-            update_waitbar(handles,0,'Spectra acquiring is not correctly started.........Please check and try again!',1);
-            acquireOpt.spectra = [];
+            if ctrlIsPressed %take the background;
+                update_waitbar(handles,0,'Background pectra acquiring is not correctly started.........Please check and try again!',1);
+                acquireOpt.background = [];
+            else
+                update_waitbar(handles,0,'Spectra acquiring is not correctly started.........Please check and try again!',1);
+                acquireOpt.spectra = [];
+            end
         end
-    else %step tuning;
+    elseif laser.continuous == 0 %step tuning;
         if ad.ReadMode ~=0  %set to FVB mode;
             update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
             ad.ReadMode=0;
@@ -1581,7 +1472,16 @@ if spectrometer.scans > 1 %WMRS
                 ad.AcquisitionMode = 2;
             end
         end
-        update_waitbar(handles,0,'Start acquiring Raman spectra...........');
+        if ctrlIsPressed
+            acquireOpt.background = [];
+        else
+            acquireOpt.spectra=[];
+        end
+        if ctrlIsPressed %take the background;
+            update_waitbar(handles,0,'Start acquiring background Raman spectra...........');
+        else
+            update_waitbar(handles,0,'Start acquiring Raman spectra...........');
+        end
         [ret] = PrepareAcquisition();
         for mm = 1:spectrometer.scans
             if laser.src == 1 %solstis
@@ -1597,31 +1497,99 @@ if spectrometer.scans > 1 %WMRS
                 cc=cc+1;
             end
             if ~isempty(spec)
-                acquireOpt.spectra = [acquireOpt.spectra spec];
+                if ctrlIsPressed
+                    acquireOpt.background = [acquireOpt.background spec];
+                else
+                    acquireOpt.spectra = [acquireOpt.spectra spec];
+                end
             end
-            update_waitbar(handles,mm/spectrometer.scans,sprintf('No.%d Raman spectrum has been acquired @ wavelength %5.3fnm ',mm,lambda(mm)))
+            if ctrlIsPressed %take the background;
+                update_waitbar(handles,mm/spectrometer.scans,sprintf('No.%d background Raman spectrum has been acquired @ wavelength %5.3fnm ',mm,lambda(mm)))
+            else
+                update_waitbar(handles,mm/spectrometer.scans,sprintf('No.%d Raman spectrum has been acquired @ wavelength %5.3fnm ',mm,lambda(mm)));
+            end
         end
+    elseif laser.continuous == 2 %no modulation tuning;        
+        if laser.src == 1 %solstis
+            laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        else %3900s
+            laser.smc.velocity = 0.1; %high speed;
+            laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
+            pause(lambdaincr/0.2); %wait to position;
+        end
+        if ad.ReadMode ~=0  %set to FVB mode;
+            update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
+            ad.ReadMode=0;
+        end
+        if ad.AcquisitionMode ~=3  %set to Kinetics mode;
+            ad.AcquisitionMode=3;
+        end
+        if ad.startAcquire == 1
+            for m = 1:spectrometer.scans
+                if ctrlIsPressed %take the background;
+                    update_waitbar(handles,0,sprintf('Start aquiring No. %d background Raman spectra...',m));
+                else
+                    update_waitbar(handles,0,sprintf('Start aquiring NO. %d Raman spectra...',m));
+                end
+                pause(spectrometer.accums*spectrometer.exposureTime);
+            end
+            while ad.isAndorIdle~=1
+                %wait until acquisition finish;
+            end
+            if ctrlIsPressed %take the background;
+                acquireOpt.background=(ad.getImage).';
+            else
+                acquireOpt.spectra=(ad.getImage).';
+            end
+        else %acquiring is not started correctly. 
+            if ctrlIsPressed %take the background;
+                update_waitbar(handles,0,'Background pectra acquiring is not correctly started.........Please check and try again!',1);
+                acquireOpt.background = [];
+            else
+                update_waitbar(handles,0,'Spectra acquiring is not correctly started.........Please check and try again!',1);
+                acquireOpt.spectra = [];
+            end
+        end
+        spectrometer.isWMRS = 0;
+        set(handles.isWMRS,'Enable','off');
+        set(handles.isWMRS,'Value',spectrometer.isWMRS);
     end
-    if laser.src == 1 %solstis
-        laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
-    else %3900s
-        laser.smc.velocity = 0.1; %high speed;        
-        laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
-        pause(lambdaincr/0.2); %wait to position;
+    if laser.continuous<2 
+        if laser.src == 1 %solstis
+            laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        else %3900s
+            laser.smc.velocity = 0.1; %high speed;
+            laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
+            pause(lambdaincr/0.2); %wait to position;
+        end
     end
     if isempty(acquireOpt.spectra)
         acquireOpt.WMRSpectrum = [];
     else
-        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+        if all(size(acquireOpt.spectra)==size(acquireOpt.background))&&acquireOpt.signalBackRef==2
+            acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra-acquireOpt.background,laser.ramanPeak);
+        else
+            if acquireOpt.signalBackRef==1 %background 
+                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.background,laser.ramanPeak);
+            else
+                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+            end
+        end
         update_waitbar(handles,0,' ');
     end
     acquireOpt.axisWavelength = ad.AxisWavelength;
     if spectrometer.isWMRS
         updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
     else
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+        if acquireOpt.signalBackRef==1 %background 
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+        else
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+        end
     end
-    set(handles.isWMRS,'Enable','on');
+    if laser.continuous<2
+        set(handles.isWMRS,'Enable','on');
+    end
 else %single spectra
     if ad.ReadMode ~=0  %set to FVB mode;
         update_waitbar(handles,0,'Changing acquisition to FVB mode.........')
@@ -1641,14 +1609,30 @@ else %single spectra
     else %3900s
         laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
     end
-    update_waitbar(handles,0,'Acquiring one spectrum.....');
+    if ctrlIsPressed %take the background;
+        update_waitbar(handles,0,'Acquiring one background spectrum.....');
+    else
+        update_waitbar(handles,0,'Acquiring one spectrum.....');
+    end
     spectrometer.isWMRS = 0;
     set(handles.isWMRS,'Enable','off');
     set(handles.isWMRS,'Value',spectrometer.isWMRS);
-    acquireOpt.spectra = ad.acquire0;
+    if ctrlIsPressed
+        acquireOpt.background = ad.acquire0;
+    else
+        acquireOpt.spectra = ad.acquire0;
+    end
     acquireOpt.axisWavelength = ad.AxisWavelength;
     acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
-    updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+    if all(size(acquireOpt.spectra)==size(acquireOpt.background))&&acquireOpt.signalBackRef==2
+        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra-acquireOpt.background);
+    else
+        if acquireOpt.signalBackRef==1 %background
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+        else
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+        end
+    end
     update_waitbar(handles,0,' ');
 end
 
@@ -1985,6 +1969,26 @@ function slitWidth_Callback(hObject, eventdata, handles)
 
 % Hints: get(hObject,'String') returns contents of slitWidth as text
 %        str2double(get(hObject,'String')) returns contents of slitWidth as a double
+acquireOpt = getUserData('acquireOpt');
+spectrometer = getUserData('spectrometer');
+ad = acquireOpt.andor;
+if isempty(ad)
+    update_waitbar(handles,0,'No Andor spectrometer was connected!',1);
+    return;
+end
+slitwidth = round(str2double(get(hObject,'String')));
+if slitwidth >= 10 && slitwidth <= 2000
+    ad.SlitWidth = slitwidth;
+    spectrometer.slitWidth = slitwidth;
+    setUserData('acquireOpt',acquireOpt);
+    setUserData('spectrometer',spectrometer);
+    str = sprintf('SlitWidth has been set to %d um!',slitwidth);
+    update_waitbar(handles,0,str);
+else 
+    str = sprintf('SlitWidth can not set as %s!', get(hObject,'String'));
+    update_waitbar(handles,0,str,1);
+end
+
 
 
 % --- Executes during object creation, after setting all properties.
@@ -2008,7 +2012,27 @@ function readMode_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns readMode contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from readMode
+acquireOpt = getUserData('acquireOpt');
+spectrometer = getUserData('spectrometer');
+ad = acquireOpt.andor;
+if isempty(ad)
+    update_waitbar(handles,0,'No Andor spectrometer was connected!',1);
+    return;
+end
 
+contents = cellstr(get(hObject,'String'));
+readmode = get(hObject,'Value');
+if readmode == 1 %FVB 
+    ad.ReadMode = 0;
+    spectrometer.readMode = 0;    
+elseif readmode == 2; %image
+    ad.ReadMode = 4;
+    spectrometer.readMode = 4;
+else
+end
+update_waitbar(handles,0,sprintf('Spectrometer has been set to %s mode now.',contents{readmode}));
+setUserData('acquireOpt',acquireOpt);
+setUserData('spectrometer',spectrometer);
 
 % --- Executes during object creation, after setting all properties.
 function readMode_CreateFcn(hObject, eventdata, handles)
@@ -2021,15 +2045,6 @@ function readMode_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-% --- Executes on button press in backSpecSubtraction.
-function backSpecSubtraction_Callback(hObject, eventdata, handles)
-% hObject    handle to backSpecSubtraction (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of backSpecSubtraction
-
 
 % --- Executes on button press in stageFlipLR.
 function stageFlipLR_Callback(hObject, eventdata, handles)
@@ -2086,3 +2101,200 @@ function cameraSelect_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on selection change in signalBackRef.
+function signalBackRef_Callback(hObject, eventdata, handles)
+% hObject    handle to signalBackRef (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns signalBackRef contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from signalBackRef
+acquireOpt = getUserData('acquireOpt');
+contents = cellstr(get(hObject,'String'));
+if strcmp(contents,'Singnal')
+    acquireOpt.signalBackRef = 0;
+    if spectrometer.isWMRS
+        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
+    else
+        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+    end
+elseif strcmp(contents,'Background')
+    acquireOpt.signalBackRef = 1;
+    if spectrometer.isWMRS && max(size(acquireOpt.background)>=3)
+        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.background,laser.ramanPeak);
+        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
+    else
+        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+    end
+elseif strcmp(contents,'Reference')
+    acquireOpt.signalBackRef = 2;
+    if spectrometer.isWMRS && all(size(acquireOpt.spectra)==size(acquireOpt.background))
+        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra-acquireOpt.background,laser.ramanPeak);
+        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
+    else
+        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+    end
+else %reserved
+end
+setUserData('acquireOpt',acquireOpt); 
+
+
+% --- Executes during object creation, after setting all properties.
+function signalBackRef_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to signalBackRef (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in modulationMode.
+function modulationMode_Callback(hObject, eventdata, handles)
+% hObject    handle to modulationMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns modulationMode contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from modulationMode
+laser = getUserData('laser');
+contents = cellstr(get(hObject,'String'));
+mode = contents{get(hObject,'Value')};
+laser.continuous = get(hObject,'Value') - 1;
+str = sprintf('Laser has be set as %s.',mode);
+update_waitbar(handles,0,str);
+setUserData('laser',laser);
+
+
+% --- Executes during object creation, after setting all properties.
+function modulationMode_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to modulationMode (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in laserSource.
+function laserSource_Callback(hObject, eventdata, handles)
+% hObject    handle to laserSource (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns laserSource contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from laserSource
+laser = getUserData('laser');
+contents = cellstr(get(hObject,'String'));
+laser.src = get(hObject,'Value') - 1;
+str = sprintf('Selecting %s as laser source now.',contents{get(hObject,'Value')});    
+update_waitbar(handles,0,str);
+if laser.src == 0 %3900s
+    if length(laser.start)==2
+        set(handles.laserStart,'String',num2str(laser.start(2)));
+    else
+        set(handles.laserStart,'String',num2str(16.3));
+    end
+    if length(laser.end)==2
+        set(handles.laserEnd,'String',num2str(laser.end(2)));
+    else
+        set(handles.laserEnd,'String',num2str(16.45));
+    end
+    
+    if isempty(laser.smc)
+        smc = SMC100();
+        if ~isempty(smc.SMCobj)
+            laser.smc = smc;
+        else
+            laser.smc = [];
+            update_waitbar(handles,0,'SMC100 cannot be initialized successfully!',1);
+            return;
+        end
+    else %Check smc status;
+        try
+            status=query(laser.smc.SMCobj,'1mm?');
+        catch
+            if ~isempty(laser.smc.SMCobj)
+                laser.smc.releaseSMC();
+            end
+            laser.smc = [];
+            update_waitbar(handles,0,'SMC100 has been disconnected, retry!');
+            return;
+        end
+        if length(status)<5 %wrong com device
+            if ~isempty(laser.smc.SMCobj)
+                laser.smc.releaseSMC();
+            end
+            laser.smc = [];
+            update_waitbar(handles,0,'SMC100 has been disconnected!');
+            return;
+        elseif status(5) == '2'||status(5) == '3'|| status(5) == '4'
+            update_waitbar(handles,0,[contents{get(hObject,'Value')} 'is selected as laser source now.']);
+        else
+            if ~isempty(laser.smc.SMCobj)
+                laser.smc.releaseSMC();
+            end
+            laser.smc = [];
+            update_waitbar(handles,0,'SMC100 is connected wrongly, please check!');
+            return;
+        end
+    end
+    laser.smc.velocity = 0.1; %high speed;
+    laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
+    pause(lambdaincr/0.2); %wait to position;
+    update_waitbar(handles,0,sprintf('Laser has been tuned to %3.1fnm',(laser.start(1)+laser.end(1))/2));
+elseif laser.src == 1%Solstis;      
+    set(handles.laserStart,'String',num2str(laser.start(1)));
+    set(handles.laserEnd,'String',num2str(laser.end(1)));    
+    if isempty(laser.sol)
+        update_waitbar(handles,0,'Initializing Solstis now.............Please wait......');
+        [sol,ii]=solstisINI();
+        laser.sol = sol;
+        laser.counter = ii;
+        if isempty(laser.sol)
+            update_waitbar(handles,0,'No successful connection to Solstis!!',1);
+            return;
+        end
+    else
+        laser.counter = solstisWAVE(laser.sol,laser.counter,(laser.start(1)+laser.end(1))/2); %move to the middle position;
+        update_waitbar(handles,0,sprintf('Laser has been tuned to %3.1fnm',(laser.start(1)+laser.end(1))/2));
+    end
+end
+setUserData('laser',laser);
+
+
+% --- Executes during object creation, after setting all properties.
+function laserSource_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to laserSource (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on button press in abortAcquiring.
+function abortAcquiring_Callback(hObject, eventdata, handles)
+% hObject    handle to abortAcquiring (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --- If Enable == 'on', executes on mouse press in 5 pixel border.
+% --- Otherwise, executes on mouse press in 5 pixel border or over abortAcquiring.
+function abortAcquiring_ButtonDownFcn(hObject, eventdata, handles)
+% hObject    handle to abortAcquiring (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
