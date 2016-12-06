@@ -146,7 +146,8 @@ if Enable
     set(handles.modulationMode,'Enable','on');  
     set(handles.slitWidth,'Enable','on'); 
     set(handles.readMode,'Enable','on'); 
-    set(handles.laserSource,'Enable','on'); 
+    set(handles.laserSource,'Enable','on');  
+    set(handles.abortAcquiring,'Enable','on'); 
 else    
     set(handles.laserStart,'Enable','off');
     set(handles.laserEnd,'Enable','off');
@@ -176,6 +177,7 @@ else
     set(handles.slitWidth,'Enable','off'); 
     set(handles.readMode,'Enable','off'); 
     set(handles.laserSource,'Enable','off'); 
+    set(handles.abortAcquiring,'Enable','off');
 end
 
 %%%%%%%%%%%\
@@ -242,6 +244,7 @@ acquireOpt.camera = [];
 acquireOpt.isRealTimeImaging = 0;
 acquireOpt.axisWavelength = [];
 acquireOpt.signalBackRef = 0;
+acquireOpt.acquiringAborted = 0; %flag for aborting acquiring;
 
 %disable buttons
 SetAllGUIButtons(handles,0);
@@ -423,6 +426,7 @@ update_waitbar(handles,0,'System is ready for use...........................');
 movegui(hObject,'center'); %move window to the center of screen;
 %Enable buttons
 SetAllGUIButtons(handles,1);
+set(handles.abortAcquiring,'Enable','off');
 set(hObject,'CloseRequestFcn',@closeApp);
 % UIWAIT makes WMRS_GUI wait for user response (see UIRESUME)
 % uiwait(handles.wmrs_figure);
@@ -1367,7 +1371,7 @@ else
 end
 
 SetAllGUIButtons(handles,0);
-
+set(handles.abortAcquiring,'Enable','on');
 if laser.src == 1 %solstis    
     lambdamin=min(laser.start(1),laser.end(1));
     lambdamax=max(laser.start(1),laser.end(1));
@@ -1380,6 +1384,8 @@ if ctrlIsPressed %take the background;
 else
     acquireOpt.spectra = [];
 end
+setUserData('acquireOpt',acquireOpt);
+
 if spectrometer.scans > 1 %may WMRS
     set(handles.isWMRS,'Enable','on');
     lambdaincr=lambdamax-lambdamin;
@@ -1407,6 +1413,10 @@ if spectrometer.scans > 1 %may WMRS
             if laser.src == 1 %solstis
                 tic;
                 while toc<scantime
+                    acquireOpt = getUserData('acquireOpt');
+                    if acquireOpt.acquiringAborted == 1
+                        break;
+                    end
                     lam=lambdamin+toc/scantime*lambdaincr;
                     laser.counter = solstisWAVE(laser.sol, laser.counter, lam);
                     if toc/scantime<=1
@@ -1424,6 +1434,10 @@ if spectrometer.scans > 1 %may WMRS
                 laser.smc.moveTo(lambdamax);
                 last = 0;
                 while last<spectrometer.scans
+                    acquireOpt = getUserData('acquireOpt');
+                    if acquireOpt.acquiringAborted == 1
+                        break;
+                    end
                     [ret, first,last] = GetNumberNewImages(); %use andor SDK function directly here, 
                     if last == 0
                         if ctrlIsPressed %take the background;
@@ -1444,10 +1458,13 @@ if spectrometer.scans > 1 %may WMRS
             while ad.isAndorIdle~=1
                 %wait until acquisition finish;
             end
-            if ctrlIsPressed %take the background;
-                acquireOpt.background=(ad.getImage).';
-            else
-                acquireOpt.spectra=(ad.getImage).';
+            
+            if acquireOpt.acquiringAborted == 0 %abort button was not pressed;
+                if ctrlIsPressed %take the background;
+                    acquireOpt.background=(ad.getImage).';
+                else
+                    acquireOpt.spectra=(ad.getImage).';
+                end
             end
         else
             if ctrlIsPressed %take the background;
@@ -1484,14 +1501,16 @@ if spectrometer.scans > 1 %may WMRS
         end
         [ret] = PrepareAcquisition();
         for mm = 1:spectrometer.scans
+            acquireOpt = getUserData('acquireOpt');
+            if acquireOpt.acquiringAborted == 1
+                break;
+            end
             if laser.src == 1 %solstis
                 laser.counter = solstisWAVE(laser.sol, laser.counter, lambda(mm));
             else %3900s
                 laser.smc.moveTo(lambda(mm));
-            end
-            
-            spec = [];cc=0;
-            spec = ad.acquire0;
+            end   
+            spec = ad.acquire0;cc=0;
             while isempty(spec)||(~all(spec)) && cc<5 %try 5 time to ensure acquire data;
                 spec = ad.acquire0;
                 cc=cc+1;
@@ -1502,6 +1521,7 @@ if spectrometer.scans > 1 %may WMRS
                 else
                     acquireOpt.spectra = [acquireOpt.spectra spec];
                 end
+                setUserData('acquireOpt',acquireOpt);
             end
             if ctrlIsPressed %take the background;
                 update_waitbar(handles,mm/spectrometer.scans,sprintf('No.%d background Raman spectrum has been acquired @ wavelength %5.3fnm ',mm,lambda(mm)))
@@ -1526,6 +1546,10 @@ if spectrometer.scans > 1 %may WMRS
         end
         if ad.startAcquire == 1
             for m = 1:spectrometer.scans
+                acquireOpt = getUserData('acquireOpt');
+                if acquireOpt.acquiringAborted == 1
+                    break;
+                end
                 if ctrlIsPressed %take the background;
                     update_waitbar(handles,0,sprintf('Start aquiring No. %d background Raman spectra...',m));
                 else
@@ -1536,10 +1560,12 @@ if spectrometer.scans > 1 %may WMRS
             while ad.isAndorIdle~=1
                 %wait until acquisition finish;
             end
-            if ctrlIsPressed %take the background;
-                acquireOpt.background=(ad.getImage).';
-            else
-                acquireOpt.spectra=(ad.getImage).';
+            if acquireOpt.acquiringAborted == 0
+                if ctrlIsPressed %take the background;
+                    acquireOpt.background=(ad.getImage).';
+                else
+                    acquireOpt.spectra=(ad.getImage).';
+                end
             end
         else %acquiring is not started correctly. 
             if ctrlIsPressed %take the background;
@@ -1563,28 +1589,30 @@ if spectrometer.scans > 1 %may WMRS
             pause(lambdaincr/0.2); %wait to position;
         end
     end
-    if isempty(acquireOpt.spectra)
-        acquireOpt.WMRSpectrum = [];
-    else
-        if all(size(acquireOpt.spectra)==size(acquireOpt.background))&&acquireOpt.signalBackRef==2
-            acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra-acquireOpt.background,laser.ramanPeak);
+    if acquireOpt.acquiringAborted == 0 %not cancelled
+        if isempty(acquireOpt.spectra)
+            acquireOpt.WMRSpectrum = [];
         else
-            if acquireOpt.signalBackRef==1 %background 
-                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.background,laser.ramanPeak);
+            if all(size(acquireOpt.spectra)==size(acquireOpt.background))&&acquireOpt.signalBackRef==2
+                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra-acquireOpt.background,laser.ramanPeak);
             else
-                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+                if acquireOpt.signalBackRef==1 %background
+                    acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.background,laser.ramanPeak);
+                else
+                    acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+                end
             end
+            update_waitbar(handles,0,' ');
         end
-        update_waitbar(handles,0,' ');
-    end
-    acquireOpt.axisWavelength = ad.AxisWavelength;
-    if spectrometer.isWMRS
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
-    else
-        if acquireOpt.signalBackRef==1 %background 
-            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+        acquireOpt.axisWavelength = ad.AxisWavelength;
+        if spectrometer.isWMRS
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
         else
-            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+            if acquireOpt.signalBackRef==1 %background
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+            else
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+            end
         end
     end
     if laser.continuous<2
@@ -1617,26 +1645,49 @@ else %single spectra
     spectrometer.isWMRS = 0;
     set(handles.isWMRS,'Enable','off');
     set(handles.isWMRS,'Value',spectrometer.isWMRS);
-    if ctrlIsPressed
-        acquireOpt.background = ad.acquire0;
+    
+    if ad.startAcquire == 1        
+        while ad.isAndorIdle~=1
+            %wait until acquisition finish;
+            acquireOpt = getUserData('acquireOpt');
+            if acquireOpt.acquiringAborted
+                break;
+            end
+        end
+        if acquireOpt.acquiringAborted == 0%no cancellation
+            if ctrlIsPressed %take the background;
+                acquireOpt.background=(ad.getImage).';
+            else
+                acquireOpt.spectra=(ad.getImage).';
+            end
+            acquireOpt.axisWavelength = ad.AxisWavelength;
+            acquireOpt.WMRSpectrum = [];            
+            update_waitbar(handles,0,'Plotting spectrum.....');
+            if all(size(acquireOpt.spectra)==size(acquireOpt.background))&&acquireOpt.signalBackRef==2
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra-acquireOpt.background);
+            else
+                if acquireOpt.signalBackRef==1 %background
+                    updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+                else
+                    updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+                end
+            end
+            update_waitbar(handles,0,' ');
+        end
     else
-        acquireOpt.spectra = ad.acquire0;
-    end
-    acquireOpt.axisWavelength = ad.AxisWavelength;
-    acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
-    if all(size(acquireOpt.spectra)==size(acquireOpt.background))&&acquireOpt.signalBackRef==2
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra-acquireOpt.background);
-    else
-        if acquireOpt.signalBackRef==1 %background
-            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+        if ctrlIsPressed %take the background;
+            update_waitbar(handles,0,'Background pectra acquiring is not correctly started.........Please check and try again!',1);
+            acquireOpt.background = [];
         else
-            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+            update_waitbar(handles,0,'Spectra acquiring is not correctly started.........Please check and try again!',1);
+            acquireOpt.spectra = [];
         end
     end
-    update_waitbar(handles,0,' ');
 end
 
 SetAllGUIButtons(handles,1);
+set(handles.abortAcquiring,'Enable','off');
+acquireOpt.acquiringAborted = 0; %reset abortion flag;
 if size(acquireOpt.spectra,2)==1
     set(handles.isWMRS,'Enable','off');
 end
@@ -1913,6 +1964,7 @@ function emergStop_Callback(hObject, eventdata, handles)
 % hObject    handle to emergStop (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+SetAllGUIButtons(handles,1);
 
 
 
@@ -2290,7 +2342,20 @@ function abortAcquiring_Callback(hObject, eventdata, handles)
 % hObject    handle to abortAcquiring (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+acquireOpt = getUserData('acquireOpt');
+ad = acquireOpt.andor;
+if isempty(ad)
+    update_waitbar(handles,0,'No Andor spectrometer is not connected correctly!!',1);
+    return;
+end
+if ad.isAndorIdle == 0
+    ad.abortAcquire;
+end
+acquireOpt.acquiringAborted = 1;
+setUserData('acquireOpt',acquireOpt);
+SetAllGUIButtons(handles,1);
+set(handles.abortAcquiring,'Enable','off');
+update_waitbar(handles,0,'Acquiring is aborted manually!!',1);
 
 % --- If Enable == 'on', executes on mouse press in 5 pixel border.
 % --- Otherwise, executes on mouse press in 5 pixel border or over abortAcquiring.
