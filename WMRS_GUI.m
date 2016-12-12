@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 01-Dec-2016 15:00:56
+% Last Modified by GUIDE v2.5 08-Dec-2016 10:41:37
 
 % Begin initialization code - DO NOT EDIT
 
@@ -148,6 +148,7 @@ if Enable
     set(handles.readMode,'Enable','on'); 
     set(handles.laserSource,'Enable','on');  
     set(handles.abortAcquiring,'Enable','on'); 
+    set(handles.cameraSelect,'Enable','on');
 else    
     set(handles.laserStart,'Enable','off');
     set(handles.laserEnd,'Enable','off');
@@ -178,6 +179,7 @@ else
     set(handles.readMode,'Enable','off'); 
     set(handles.laserSource,'Enable','off'); 
     set(handles.abortAcquiring,'Enable','off');
+    set(handles.cameraSelect,'Enable','off');
 end
 
 %%%%%%%%%%%\
@@ -290,11 +292,24 @@ ylabel('Raman intensity (counts)');
 update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
 try 
     vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
+    camNum = 1;
 catch 
     vid = [];src = []; image = []; hImage = [];
     axes(handles.imagePlot);axis off;
-    warning('Camera is not connected!!');
+    warning('ImagingSource Camera is not connected!!');
 end
+if isempty(vid)
+    update_waitbar(handles,0,'Initializing Hamamatsu camera.............Please wait......',1);
+    try
+        vid = videoinput('hamamatsu', 1, 'MONO8_1344x1024');
+        camNum = 2;
+    catch
+        vid = [];src = []; image = []; hImage = [];
+        axes(handles.imagePlot);axis off;
+        warning('Hamamatsu Camera is not connected!!');
+    end
+end
+set(handles.cameraSelect,'Value',camNum);
 if ~isempty(vid)
     src = getselectedsource(vid);
     vid.FramesPerTrigger = 1;
@@ -310,15 +325,38 @@ if ~isempty(vid)
         update_waitbar(handles,0,'Camera is used by another application!!!',1);
     end
 end
-if ~isempty(vid)
-    image = getdata(vid);
+if ~isempty(vid)      
+    switch camNum
+        case 1 %imagingSource Camera;
+            set(handles.CamExposSlider,'Min',0.0001,'Max',2,'SliderStep',[0.001 0.05]);
+            set(handles.CamExposSlider,'Value',src.Exposure);
+            src.ExposureAuto = 'On'; set(handles.CamExposSlider,'Enable','off');
+            set(handles.autoExposure,'Visible','on'); set(handles.autoExposure,'Value',1); 
+            set(handles.exposureTimeEdit,'Visible','off');  set(handles.expUnits,'Visible','off');  
+            image = getdata(vid);
+        case 2  %hamatsu camera;
+            set(handles.CamExposSlider,'Min',1e-05,'Max',10,'SliderStep',[1e-05 0.001]);
+            set(handles.CamExposSlider,'Value',src.ExposureTime);
+            if src.ExposureTime<0.1 && src.ExposureTime>1e-04
+                expTime = src.ExposureTime*10^3;
+                set(handles.expUnits,'String','ms');
+            elseif src.ExposureTime<=1e-04
+                expTime = src.ExposureTime*10^6;
+                set(handles.expUnits,'String','us');
+            else
+                set(handles.expUnits,'String','s');
+            end
+            set(handles.exposureTimeEdit,'String',num2str(expTime));
+            src.ExposureTimeMode = 'Manual';
+            set(handles.CamExposSlider,'Enable','on');
+            set(handles.autoExposure,'Visible','off');            
+            set(handles.exposureTimeEdit,'Visible','on');set(handles.expUnits,'Visible','on');  
+            image = fliplr(getdata(vid));
+        otherwise
+    end
     axes(handles.imagePlot);
     hImage = imagesc(image);
     axis image;axis off;
-    set(handles.CamExposSlider,'Min',0.0001,'Max',2,'SliderStep',[0.001 0.05]);
-    set(handles.CamExposSlider,'Value',src.Exposure);
-    src.ExposureAuto = 'On'; set(handles.CamExposSlider,'Enable','off');
-    set(handles.autoExposure,'Value',1);
     if ~isempty(laser.marker)
         x=laser.marker(1);y=laser.marker(2);
         h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
@@ -1167,7 +1205,13 @@ update_waitbar(handles,0,' ');
 
 function mypreview_fcn(obj,event,himage)
 % Display image data.
-himage.CData = event.Data;
+src = getselectedsource(obj);
+if strcmp(src.SourceName,'input1'); 
+    rotImg = fliplr(event.Data); %flip image;
+    himage.CData = rotImg;
+else
+    himage.CData = event.Data;
+end
     
 % --- Executes on button press in isRealTimeImaging.
 function isRealTimeImaging_Callback(hObject, eventdata, handles)
@@ -1688,7 +1732,7 @@ end
 SetAllGUIButtons(handles,1);
 set(handles.abortAcquiring,'Enable','off');
 acquireOpt.acquiringAborted = 0; %reset abortion flag;
-if size(acquireOpt.spectra,2)==1
+if min(size(acquireOpt.spectra))==1
     set(handles.isWMRS,'Enable','off');
 end
 setUserData('acquireOpt',acquireOpt);
@@ -1862,12 +1906,31 @@ function CamExposSlider_Callback(hObject, eventdata, handles)
 % Hints: get(hObject,'Value') returns position of slider
 %        get(hObject,'Min') and get(hObject,'Max') to determine range of slider
 acquireOpt = getUserData('acquireOpt'); 
-acquireOpt.camera.src.Exposure = get(hObject,'Value');
-if get(hObject,'Min') == get(hObject,'Value')
-    acquireOpt.camera.src.GainAuto = 'Off'; %set auto Gain;
-    acquireOpt.camera.src.Gain = 34; %set Gain as minimum too;
-else
-    acquireOpt.camera.src.GainAuto = 'On'; %set auto Gain;
+camNum = get(handles.cameraSelect,'Value');
+switch camNum
+    case 1
+        acquireOpt.camera.src.Exposure = get(hObject,'Value');
+        if get(hObject,'Min') == get(hObject,'Value')
+            acquireOpt.camera.src.GainAuto = 'Off'; %set auto Gain;
+            acquireOpt.camera.src.Gain = 34; %set Gain as minimum too;
+        else
+            acquireOpt.camera.src.GainAuto = 'On'; %set auto Gain;
+        end
+    case 2
+        expTime = get(hObject,'Value');
+        acquireOpt.camera.src.ExposureTime = expTime;
+        if expTime<0.1 && expTime>1e-04
+            expTime = acquireOpt.camera.src.ExposureTime*10^3;
+            set(handles.expUnits,'String','ms');
+        elseif expTime<=1e-04
+            expTime = acquireOpt.camera.src.ExposureTime*10^6;
+            set(handles.expUnits,'String','us');
+        else
+            expTime = acquireOpt.camera.src.ExposureTime;
+            set(handles.expUnits,'String','s');
+        end
+        set(handles.exposureTimeEdit,'String',num2str(expTime));
+    otherwise
 end
     
 setUserData('acquireOpt',acquireOpt);
@@ -2140,6 +2203,114 @@ function cameraSelect_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns cameraSelect contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from cameraSelect
+acquireOpt = getUserData('acquireOpt');
+laser = getUserData('laser');
+camNum = get(hObject,'Value');
+
+%stop current camera;
+if ~isempty(acquireOpt.camera)
+    if ishandle(acquireOpt.camera.vid)
+        if (strcmpi(acquireOpt.camera.vid.Running,'on'))
+            stop(acquireOpt.camera.vid);
+        end
+        delete(acquireOpt.camera.vid);
+        acquireOpt.camera = [];
+    end
+end
+
+if camNum == 1 %imagingSource camera
+update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
+try 
+    vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
+catch 
+    vid = [];src = []; image = []; hImage = [];
+    axes(handles.imagePlot);axis off;
+    warning('ImagingSource Camera is not connected!!');
+end
+elseif camNum == 2 %hamatsu camera;
+    update_waitbar(handles,0,'Initializing Hamamatsu camera.............Please wait......',1);
+    try
+        vid = videoinput('hamamatsu', 1, 'MONO8_1344x1024');
+    catch
+        vid = [];src = []; image = []; hImage = [];
+        axes(handles.imagePlot);axis off;
+        warning('Hamamatsu Camera is not connected!!');
+    end
+end
+
+if ~isempty(vid)
+    src = getselectedsource(vid);
+    vid.FramesPerTrigger = 1;    
+    try
+        start(vid);
+    catch
+        stop(vid);
+        delete(vid);
+        vid = []; src = [];    image = [];    hImage = [];
+        axes(handles.imagePlot);axis off;
+        warning('Camera is occupied!!');
+        update_waitbar(handles,0,'Camera is used by another application!!!',1);
+    end
+end
+if ~isempty(vid)    
+    switch camNum
+        case 1 %imagingSource Camera;
+            set(handles.CamExposSlider,'Min',0.0001,'Max',2,'SliderStep',[0.001 0.05]);
+            set(handles.CamExposSlider,'Value',src.Exposure);
+            src.ExposureAuto = 'On'; set(handles.CamExposSlider,'Enable','off');
+            set(handles.autoExposure,'Visible','on'); set(handles.autoExposure,'Value',1); 
+            set(handles.exposureTimeEdit,'Visible','off');  set(handles.expUnits,'Visible','off');  
+        case 2  %hamatsu camera;
+            src.ExposureTime = 0.001; %intial exp time;
+            set(handles.CamExposSlider,'Min',max([src.ExposureTime/10 1e-05]),'Max',min([10 src.ExposureTime*100]),'SliderStep',[max([src.ExposureTime/10 1e-05]) src.ExposureTime*10]);
+            set(handles.CamExposSlider,'Value',src.ExposureTime);
+            if src.ExposureTime<0.1 && src.ExposureTime>1e-04
+                expTime = src.ExposureTime*10^3;
+                set(handles.expUnits,'String','ms');
+            elseif src.ExposureTime<=1e-04
+                expTime = src.ExposureTime*10^6;
+                set(handles.expUnits,'String','us');
+            else
+                expTime = src.ExposureTime;
+                set(handles.expUnits,'String','s');
+            end
+            set(handles.exposureTimeEdit,'String',num2str(expTime));
+            src.ExposureTimeMode = 'Manual';
+            set(handles.CamExposSlider,'Enable','on');
+            set(handles.autoExposure,'Visible','off');            
+            set(handles.exposureTimeEdit,'Visible','on');set(handles.expUnits,'Visible','on');  
+        otherwise
+    end
+    if camNum == 1 %imagingSource
+        image = getdata(vid);
+    elseif camNum == 2%hamatsu
+        image = fliplr(getdata(vid));
+    end       
+    axes(handles.imagePlot);
+    hImage = imagesc(image);
+    axis image;axis off;  
+else
+    update_waitbar(handles,0,' ');
+end
+dragzoom([handles.specPlot,handles.imagePlot]);
+acquireOpt.camera.vid = vid;
+acquireOpt.camera.src = src;
+acquireOpt.image = image;
+acquireOpt.hImage = hImage;
+if ~isempty(laser.marker)
+    x=laser.marker(1);y=laser.marker(2);
+    h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
+    laser.markerCross(1)=h;
+    h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
+    laser.markerCross(2)=h;
+end
+if ~isempty(vid) && get(handles.isRealTimeImaging,'Value')
+    setappdata(acquireOpt.hImage,'UpdatePreviewWindowFcn',@mypreview_fcn);
+    preview(acquireOpt.camera.vid, acquireOpt.hImage);
+    update_waitbar(handles,0,'Camera in preview mode....',1);
+end
+setUserData('laser',laser);
+setUserData('acquireOpt',acquireOpt);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -2363,3 +2534,66 @@ function abortAcquiring_ButtonDownFcn(hObject, eventdata, handles)
 % hObject    handle to abortAcquiring (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+
+
+
+function exposureTimeEdit_Callback(hObject, eventdata, handles)
+% hObject    handle to exposureTimeEdit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of exposureTimeEdit as text
+%        str2double(get(hObject,'String')) returns contents of exposureTimeEdit as a double
+expTime = str2double(get(hObject,'String'));
+acquireOpt = getUserData('acquireOpt');
+vid = acquireOpt.camera.vid;
+src = acquireOpt.camera.src;
+
+if isempty(vid)
+    update_waitbar(handles,0,'No camera is connected!!',1);
+    return;
+end;
+
+if ~isnan(expTime)
+    expUnits = get(handles.expUnits,'String');
+    if strcmp(expUnits,'ms')
+        expTime = expTime/10^3;
+    elseif strcmp(expUnits,'us')
+        expTime = expTime/10^6;
+    end
+    if expTime<10^(-5)
+        expTime = 10^(-5);
+        update_waitbar(handles,0,'Camera exposure time is set to be minimum!!',1);
+    end
+    src.ExposureTime = expTime;
+    set(handles.CamExposSlider,'Min',max([expTime/10 1e-05]),'Max',min([10 expTime*100]),'SliderStep',[max([expTime/10 1e-05]) expTime*10]);
+    set(handles.CamExposSlider,'Value',expTime);
+    if src.ExposureTime<0.1 && src.ExposureTime>1e-04
+        expTime = src.ExposureTime*10^3;
+        set(handles.expUnits,'String','ms');
+    elseif src.ExposureTime<=1e-04
+        expTime = src.ExposureTime*10^6;
+        set(handles.expUnits,'String','us');
+    else
+        expTime = src.ExposureTime;
+        set(handles.expUnits,'String','s');
+    end
+    set(handles.exposureTimeEdit,'String',num2str(expTime));
+else
+    update_waitbar(handles,0,'Exposure time is not input correctly!!',1);
+end
+acquireOpt.camera.src = src;
+acquireOpt.camera.vid = vid;
+setUserData('acquireOpt',acquireOpt); 
+
+% --- Executes during object creation, after setting all properties.
+function exposureTimeEdit_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to exposureTimeEdit (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
