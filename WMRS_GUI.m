@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 08-Dec-2016 10:41:37
+% Last Modified by GUIDE v2.5 13-Dec-2016 14:12:15
 
 % Begin initialization code - DO NOT EDIT
 
@@ -131,9 +131,6 @@ if Enable
     set(handles.isRealTimeImaging,'Enable','on');
     set(handles.acquireSpec,'Enable','on');
     set(handles.save,'Enable','on');
-    set(handles.saveSpecRadio,'Enable','on');
-    set(handles.saveImgRadio,'Enable','on');
-    set(handles.saveBothRadio,'Enable','on');
     set(handles.open,'Enable','on');
     set(handles.fileName,'Enable','on');
     set(handles.pickRamanPeak,'Enable','on');
@@ -149,6 +146,7 @@ if Enable
     set(handles.laserSource,'Enable','on');  
     set(handles.abortAcquiring,'Enable','on'); 
     set(handles.cameraSelect,'Enable','on');
+    set(handles.fileSaveOption,'Enable','on');
 else    
     set(handles.laserStart,'Enable','off');
     set(handles.laserEnd,'Enable','off');
@@ -162,9 +160,6 @@ else
     set(handles.isRealTimeImaging,'Enable','off');
     set(handles.acquireSpec,'Enable','off');
     set(handles.save,'Enable','off');
-    set(handles.saveSpecRadio,'Enable','off');
-    set(handles.saveImgRadio,'Enable','off');
-    set(handles.saveBothRadio,'Enable','off');
     set(handles.open,'Enable','off');
     set(handles.fileName,'Enable','off');
     set(handles.pickRamanPeak,'Enable','off');
@@ -180,6 +175,7 @@ else
     set(handles.laserSource,'Enable','off'); 
     set(handles.abortAcquiring,'Enable','off');
     set(handles.cameraSelect,'Enable','off');
+    set(handles.fileSaveOption,'Enable','off');
 end
 
 %%%%%%%%%%%\
@@ -260,20 +256,8 @@ set(handles.autoSuffix,'Value',fileOpt.autoSuffix);
 set(handles.isRealTimeImaging,'Value',0); acquireOpt.isRealTimeImaging = 0;
 set(handles.ramanPeak,'String',num2str(laser.ramanPeak));
 
-switch fileOpt.saveOpt
-    case 0 %save image
-        set(handles.saveSpecRadio,'Value',0);
-        set(handles.saveImgRadio,'Value',1);
-        set(handles.saveBothRadio,'Value',0);
-    case 1  %save spectrum;
-        set(handles.saveSpecRadio,'Value',1);
-        set(handles.saveImgRadio,'Value',0);
-        set(handles.saveBothRadio,'Value',0);
-    case 2 %save both;
-        set(handles.saveSpecRadio,'Value',0);
-        set(handles.saveImgRadio,'Value',0);
-        set(handles.saveBothRadio,'Value',1);
-end
+set(handles.fileSaveOption,'Value',fileOpt.saveOpt+1)
+
 if ~isempty(fileOpt.fname)
     set(handles.fileName,'String',fileOpt.fname);
 end
@@ -632,26 +616,6 @@ function accums_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
-% --- Executes on button press in SolstisRadio.
-function SolstisRadio_Callback(hObject, eventdata, handles)
-% hObject    handle to SolstisRadio (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of SolstisRadio
-
-
-% --- Executes on button press in radiobutton2.
-function radiobutton2_Callback(hObject, eventdata, handles)
-% hObject    handle to radiobutton2 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of radiobutton2
-
-
 
 function modStart_Callback(hObject, eventdata, handles)
 % hObject    handle to modStart (see GCBO)
@@ -1262,42 +1226,66 @@ spectrometer = getUserData('spectrometer');
 laser = getUserData('laser');
 
 if fileOpt.saveOpt == 1 || fileOpt.saveOpt == 2  %open spectra into plot or both;    
-    [FileName,PathName] = uigetfile([fileOpt.specFolder filesep '*.sif'],'Select a spectrum file');
-    if FileName == 0 
-        return;
-    end
-    fname = [PathName FileName];
-    data = sifreadnk(fname);
-    if isempty(data)
-        update_waitbar(handles,0,sprintf('Can not find or open %s...',fname),1);
-        return;
-    end
-    acquireOpt.spectra = squeeze(data.imageData);
-    acquireOpt.axisWavelength = data.axisWavelength;
-    if size(acquireOpt.spectra,2)==1
-        spectrometer.isWMRS = 0;
-        set(handles.isWMRS,'Enable','off');
-        set(handles.isWMRS,'Value',spectrometer.isWMRS);
-        acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
-        update_waitbar(handles,0,' ');
-    else
-        if isempty(acquireOpt.spectra)
-            acquireOpt.WMRSpectrum = [];
-        else
-            acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
-            update_waitbar(handles,0,' ');
+    [FileName,PathName] = uigetfile([fileOpt.specFolder filesep '*.sif'],'Select a spectrum file','MultiSelect','on');    
+    if iscell(FileName)
+        for m=1:length(FileName)
+            fname = [PathName cell2mat(FileName(m))];
+            data = sifreadnk(fname);
+            if isempty(data)
+                update_waitbar(handles,0,sprintf('Can not find or open %s...',fname),1);
+                return;
+            end
+            spec = squeeze(data.imageData);
+            figure('Name',fname,'NumberTitle','off');
+            if spectrometer.isWMRS && size(spec,2)>2
+                plot(data.axisWavelength,calculateWMRspec(spec,laser.ramanPeak));
+                title(cell2mat(FileName(m)),'interpreter','none');axis tight;grid on;
+                xlabel('Raman shift (nm)');
+                ylabel('Raman intensity (counts)');
+            else
+                plot(data.axisWavelength,spec);axis tight;
+                title(cell2mat(FileName(m)),'interpreter','none');axis tight;grid on;
+                xlabel('Raman shift (nm)');
+                ylabel('Raman intensity (counts)');
+            end
         end
-        set(handles.isWMRS,'Enable','on');
-        if spectrometer.isWMRS
-            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
-        else
+    else       
+        if FileName == 0
+            return;
+        end
+        fname = [PathName FileName];
+        data = sifreadnk(fname);
+        if isempty(data)
+            update_waitbar(handles,0,sprintf('Can not find or open %s...',fname),1);
+            return;
+        end
+        acquireOpt.spectra = squeeze(data.imageData);
+        acquireOpt.axisWavelength = data.axisWavelength;
+        if size(acquireOpt.spectra,2)==1
+            spectrometer.isWMRS = 0;
+            set(handles.isWMRS,'Enable','off');
+            set(handles.isWMRS,'Value',spectrometer.isWMRS);
+            acquireOpt.WMRSpectrum = [];update_waitbar(handles,0,'Plotting spectrum.....');
             updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+            update_waitbar(handles,0,' ');
+        else
+            if isempty(acquireOpt.spectra)
+                acquireOpt.WMRSpectrum = [];
+            else
+                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+                update_waitbar(handles,0,' ');
+            end
+            set(handles.isWMRS,'Enable','on');
+            if spectrometer.isWMRS
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
+            else
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+            end
         end
+        setUserData('spectrometer',spectrometer);
+        setUserData('acquireOpt',acquireOpt);
+        update_waitbar(handles,0,sprintf('Load spectra from sif file: %s.........',fname));
     end
-    setUserData('spectrometer',spectrometer);
-    setUserData('acquireOpt',acquireOpt);
-    update_waitbar(handles,0,sprintf('Load spectra from sif file: %s.........',fname));    
 end
 if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
     [FileName,PathName] = uigetfile([fileOpt.specFolder filesep '*.tif'],'Select the tif image file');
@@ -1321,7 +1309,7 @@ if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
         if ~isempty(acquireOpt.image)
             axes(handles.imagePlot);
             acquireOpt.hImage = imagesc(acquireOpt.image); axis image;axis off;
-            set(hImage,'ButtonDownFcn',@imagePlot_ButtonDownFcn);
+            set(acquireOpt.hImage,'ButtonDownFcn',@imagePlot_ButtonDownFcn);
             %refresh the laser cross marker
             if ~isempty(laser.markerCross)
                 if ishandle(laser.markerCross(1))
@@ -1347,43 +1335,6 @@ if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
         update_waitbar(handles,0,sprintf('can not have been opened image from: %s.........',fname),1);
     end
 end
-
-
-% --------------------------------------------------------------------
-function uibuttongroup3_ButtonDownFcn(hObject, eventdata, handles)
-% hObject    handle to uibuttongroup3 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% --- Executes on button press in saveSpecRadio.
-function saveSpecRadio_Callback(hObject, eventdata, handles)
-% hObject    handle to saveSpecRadio (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of saveSpecRadio
-%acquireOpt = getUserData('acquireOpt');
-%laser = getUserData('laser');
-%spectrometer = getUserData('spectrometer');
-fileOpt = getUserData('fileOpt');
-if get(hObject,'Value')
-    fileOpt.saveOpt = 1;
-end
-setUserData('fileOpt',fileOpt);
-
-
-% --- Executes on button press in saveImgRadio.
-function saveImgRadio_Callback(hObject, eventdata, handles)
-% hObject    handle to saveImgRadio (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of saveImgRadio
-fileOpt = getUserData('fileOpt');
-if get(hObject,'Value')
-    fileOpt.saveOpt=0;
-end
-setUserData('fileOpt',fileOpt);
 
 % --- Executes on button press in acquireSpec.
 function acquireSpec_Callback(hObject, eventdata, handles)
@@ -1728,7 +1679,11 @@ else %single spectra
         end
     end
 end
-
+if ctrlIsPressed %background
+    set(handles.signalBackRef,'Value',2);
+else %signal
+    set(handles.signalBackRef,'Value',1);
+end
 SetAllGUIButtons(handles,1);
 set(handles.abortAcquiring,'Enable','off');
 acquireOpt.acquiringAborted = 0; %reset abortion flag;
@@ -1748,65 +1703,6 @@ xlabel('Raman shift (nm)');
 ylabel('Raman intensity (counts)');
 axes(handles.imagePlot);axis image;
 dragzoom([handles.imagePlot handles.specPlot]);
-
-
-% function v1 = calculateWMRspec(spec,ramanPk)
-% %calculate WMRS with PCA
-% if nargin<2 
-%     ramanPk = 123;
-% end
-% if isempty(ramanPk)
-%     ramanPk = 123;
-% end
-% % cosmic ray treatment new method for each spectrum; presume that
-% % cosmic ray will not occurpy more than 1 pixel. all cosmic ray
-% % occupy more than 2 pixels will not be removed correctly.
-% for mm = 1:size(spec,2)
-%     spec = double(spec);
-%     [pks,locs] = findpeaks(double(spec(:,mm))); %find local peaks
-%     for pp = 1:length(pks)
-%         if locs(pp)<3
-%             continue;
-%         elseif locs(pp)>size(spec(:,mm),1)-2
-%             continue;
-%         end
-%         locPk = spec(locs(pp)-2:locs(pp)+2,mm);
-%         meankk = mean(locPk([1:2 4:5]));
-%         mmkk = abs(locPk([1:2 4:5])-meankk);
-%         avpk = mean(mmkk);
-%         stdpk = std(mmkk);
-%         for kk = 1:length(locPk)
-%             if (locPk(kk)-meankk) > avpk+5*stdpk
-%                 spec(locs(pp)-3+kk,mm)=spec(locs(pp)-3+kk-1,mm); %set by nearby previous value
-%             end
-%         end
-%     end
-% end
-% normfactor = double(repmat(sum(spec),size(spec,1),1));
-% spec = spec./normfactor; %normalized by total energy;
-% spec = double(spec');
-% 
-% % cosmic ray treatment with all spectrum;
-% sppp = spec;
-% for idd = 1:size(spec,1)
-%     spec(idd,:)=circshift(spec(idd,:),[0 -(idd-1)]);  %idd - 1 depends on the modulation range; move the spectra;
-% end
-% ss=sort(spec,1);
-% ssm1=ss(1:end-1,1:end-idd);
-% mmd = mean(ssm1);
-% [row,col,ind] = find((spec(:,1:end-idd)-repmat(mmd,size(spec,1),1))>repmat(3*std(ssm1),size(spec,1),1));
-% %[row,col]=ind2sub(size(spec),ind);
-% for idd = 1:length(row)
-%     sppp(row(idd),col(idd)+row(idd)-1) = mmd(col(idd));    %replace cosmic ray data point with the mean value;
-% end
-% spec = sppp;
-% 
-% %PCA
-% spec0=spec-repmat(mean(spec),[size(spec,1),1]);%spec0=spec-repmat(mean(spec')',[1,size(spec,2)]);
-% [v,d]=eig(cov(spec0'));
-% v1=spec0'*v(:,end);
-% v1=v1*sign(v1(ramanPk))*mean(normfactor(1,:));
-
 
 % --- Executes on button press in pickRamanPeak.
 function pickRamanPeak_Callback(hObject, eventdata, handles)
@@ -1881,21 +1777,6 @@ function SelectCam_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-
-% --- Executes on button press in saveBothRadio.
-function saveBothRadio_Callback(hObject, eventdata, handles)
-% hObject    handle to saveBothRadio (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of saveBothRadio
-fileOpt = getUserData('fileOpt');
-if get(hObject,'Value')
-    fileOpt.saveOpt=2; 
-end
-setUserData('fileOpt',fileOpt);
-
 
 % --- Executes on slider movement.
 function CamExposSlider_Callback(hObject, eventdata, handles)
@@ -2335,32 +2216,40 @@ function signalBackRef_Callback(hObject, eventdata, handles)
 % Hints: contents = cellstr(get(hObject,'String')) returns signalBackRef contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from signalBackRef
 acquireOpt = getUserData('acquireOpt');
-contents = cellstr(get(hObject,'String'));
-if strcmp(contents,'Singnal')
-    acquireOpt.signalBackRef = 0;
-    if spectrometer.isWMRS
-        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
-    else
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
-    end
-elseif strcmp(contents,'Background')
-    acquireOpt.signalBackRef = 1;
-    if spectrometer.isWMRS && max(size(acquireOpt.background)>=3)
-        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.background,laser.ramanPeak);
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
-    else
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
-    end
-elseif strcmp(contents,'Reference')
-    acquireOpt.signalBackRef = 2;
-    if spectrometer.isWMRS && all(size(acquireOpt.spectra)==size(acquireOpt.background))
-        acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra-acquireOpt.background,laser.ramanPeak);
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
-    else
-        updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
-    end
-else %reserved
+spectrometer = getUserData('spectrometer');
+flag = get(hObject,'Value');
+switch flag
+    case 1
+        acquireOpt.signalBackRef = 0;
+        if spectrometer.isWMRS
+            acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
+        else
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+        end
+    case 2
+        acquireOpt.signalBackRef = 1;
+        if spectrometer.isWMRS && max(size(acquireOpt.background)>=3)
+            acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.background,laser.ramanPeak);
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
+        else
+            if ~isempty(acquireOpt.background)
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.background);
+            end
+        end
+    case 3
+        acquireOpt.signalBackRef = 2;
+        if spectrometer.isWMRS && all(size(acquireOpt.spectra)==size(acquireOpt.background))
+            acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra-acquireOpt.background,laser.ramanPeak);
+            updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.WMRSpectrum);
+        else
+            if all(size(acquireOpt.spectra)==size(acquireOpt.background))
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra-acquireOpt.background);
+            else
+                updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);
+            end
+        end
+    otherwise %reserved
 end
 setUserData('acquireOpt',acquireOpt); 
 
@@ -2593,6 +2482,31 @@ function exposureTimeEdit_CreateFcn(hObject, eventdata, handles)
 % handles    empty - handles not created until after all CreateFcns called
 
 % Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+
+% --- Executes on selection change in fileSaveOption.
+function fileSaveOption_Callback(hObject, eventdata, handles)
+% hObject    handle to fileSaveOption (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: contents = cellstr(get(hObject,'String')) returns fileSaveOption contents as cell array
+%        contents{get(hObject,'Value')} returns selected item from fileSaveOption
+fileOpt = getUserData('fileOpt');
+fileOpt.saveOpt = get(hObject,'Value') - 1; %0 - image, 1 - spec, 2 - both; 
+setUserData('fileOpt',fileOpt);
+
+% --- Executes during object creation, after setting all properties.
+function fileSaveOption_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to fileSaveOption (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: popupmenu controls usually have a white background on Windows.
 %       See ISPC and COMPUTER.
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');

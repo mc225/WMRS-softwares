@@ -1763,13 +1763,13 @@ Initialize(varargin{:})
                     end
                 end
                 
-                xValStr = sprintf('X: %.*g, Y: %.*g', countDigX,acx,countDigY,acy);
+                xValStr = sprintf('X: %.2f, Y: %.1f', acx,acy);
                 yValStr = sprintf(' %.*g ', countDigY, acy);
             end
             
 %             set(mPointerCross.htext(left), 'String', yValStr);
 %             set(mPointerCross.htext(right), 'String', yValStr);
-            set(mPointerCross.htext(bottom), 'String', xValStr);
+             set(mPointerCross.htext(bottom), 'String', xValStr);
 %             set(mPointerCross.htext(top), 'String', xValStr);
             
             extent = get(mPointerCross.htext(left), 'Extent');
@@ -1783,7 +1783,15 @@ Initialize(varargin{:})
             
 %             set(mPointerCross.htext(left), 'Position', [acx-2*extent(3), acy-extent(4)/2]);
 %             set(mPointerCross.htext(right), 'Position', [xlim(2) acy]);
-            set(mPointerCross.htext(bottom), 'Position', [acx-extent1(4)/2, acy+2*extent1(4)]);
+             posx = acx+0.08*extent1(3);             
+             posy = acy+1.8*extent1(4);
+             if posy + extent1(4) > ylim(2)
+                 posy = acy - 0.5*extent1(4);
+             end
+             if posx + extent1(3) >xlim(2)
+                 posx = posx - 1.16*extent1(3);
+             end
+             set(mPointerCross.htext(bottom), 'Position', [posx posy]); %[acx-extent1(4)/2, acy+2*extent1(4)]);
 %             set(mPointerCross.htext(top), 'Position', [acx, ylim(2)]);
         end
     end
