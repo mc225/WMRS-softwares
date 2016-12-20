@@ -253,7 +253,7 @@ set(handles.laserEnd,'String',num2str(laser.end));
 set(handles.modulationMode,'Value',laser.continuous+1);
 set(handles.isWMRS,'Value',spectrometer.isWMRS);set(handles.isWMRS,'Enable','off');
 set(handles.autoSuffix,'Value',fileOpt.autoSuffix);
-set(handles.isRealTimeImaging,'Value',0); acquireOpt.isRealTimeImaging = 0;
+set(handles.isRealTimeImaging,'Value',1); acquireOpt.isRealTimeImaging = 1;
 set(handles.ramanPeak,'String',num2str(laser.ramanPeak));
 
 set(handles.fileSaveOption,'Value',fileOpt.saveOpt+1)
@@ -280,7 +280,7 @@ try
 catch 
     vid = [];src = []; image = []; hImage = [];
     axes(handles.imagePlot);axis off;
-    warning('ImagingSource Camera is not connected!!');
+    update_waitbar(handles,0,'ImagingSource Camera is not connected!!',1);
 end
 if isempty(vid)
     update_waitbar(handles,0,'Initializing Hamamatsu camera.............Please wait......',1);
@@ -290,7 +290,7 @@ if isempty(vid)
     catch
         vid = [];src = []; image = []; hImage = [];
         axes(handles.imagePlot);axis off;
-        warning('Hamamatsu Camera is not connected!!');
+        update_waitbar(handles,0,'Hamamatsu Camera is not connected!!',1);
     end
 end
 set(handles.cameraSelect,'Value',camNum);
@@ -305,7 +305,6 @@ if ~isempty(vid)
         delete(vid);
         vid = []; src = [];    image = [];    hImage = [];
         axes(handles.imagePlot);axis off;
-        warning('Camera is occupied!!');
         update_waitbar(handles,0,'Camera is used by another application!!!',1);
     end
 end
@@ -341,13 +340,13 @@ if ~isempty(vid)
     axes(handles.imagePlot);
     hImage = imagesc(image);
     axis image;axis off;
-    if ~isempty(laser.marker)
-        x=laser.marker(1);y=laser.marker(2);
-        h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
-        laser.markerCross(1)=h;
-        h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
-        laser.markerCross(2)=h;
-    end    
+%     if ~isempty(laser.marker)
+%         x=laser.marker(1);y=laser.marker(2);
+%         h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
+%         laser.markerCross(1)=h;
+%         h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
+%         laser.markerCross(2)=h;
+%     end 
 end
 
 dragzoom([handles.specPlot,handles.imagePlot]);
@@ -356,6 +355,20 @@ acquireOpt.camera.vid = vid;
 acquireOpt.camera.src = src;
 acquireOpt.image = image;
 acquireOpt.hImage = hImage;
+
+if ~isempty(vid) && acquireOpt.isRealTimeImaging == 1
+    setappdata(acquireOpt.hImage,'UpdatePreviewWindowFcn',@mypreview_fcn);
+    preview(acquireOpt.camera.vid, acquireOpt.hImage);
+    update_waitbar(handles,0,'Camera in preview mode....',1);
+end
+if ~isempty(laser.marker)
+    axes(handles.imagePlot);
+    x=laser.marker(1);y=laser.marker(2);
+    h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
+    laser.markerCross(1)=h;
+    h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
+    laser.markerCross(2)=h;
+end
 
 setUserData('laser',laser);
 setUserData('acquireOpt',acquireOpt);
@@ -369,7 +382,6 @@ try
 catch
     ad = [];
     fprintf('\n');
-    warning('Andor is not initialized successfully!');
     update_waitbar(handles,0,'Andor is not initialized successfully!',1);
 end
 if ~isempty(ad)
@@ -424,7 +436,7 @@ else % 3900s
         set(handles.laserSource,'Value',1); %set 3900s;
     else
         laser.smc = [];
-        warning('SMC100 is not initialized successfully!');
+        update_waitbar(handles,0,'SMC100 is not initialized successfully!',1);
     end
     if length(laser.start)>1
         set(handles.laserStart,'String',num2str(laser.start(2)));
@@ -444,8 +456,8 @@ setUserData('acquireOpt',acquireOpt);
 setUserData('fileOpt',fileOpt);
 setUserData('spectrometer',spectrometer);
 
-update_waitbar(handles,0,'System is ready for use...........................');
 movegui(hObject,'center'); %move window to the center of screen;
+update_waitbar(handles,0,'System is ready for use...........................');
 %Enable buttons
 SetAllGUIButtons(handles,1);
 set(handles.abortAcquiring,'Enable','off');
@@ -2086,6 +2098,17 @@ function cameraSelect_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from cameraSelect
 acquireOpt = getUserData('acquireOpt');
 laser = getUserData('laser');
+if ~isempty(acquireOpt.camera.vid)
+    if ~isempty(strfind(acquireOpt.camera.vid.Name,'tisimaq_r2013'))
+        curCamNum = 1;
+    elseif ~isempty(strfind(acquireOpt.camera.vid.Name,'hamamatsu'))
+        curCamNum = 2;
+    else
+        curCamNum = 0;
+    end
+else
+    curCamNum = 0;
+end
 camNum = get(hObject,'Value');
 
 %stop current camera;
@@ -2099,23 +2122,32 @@ if ~isempty(acquireOpt.camera)
     end
 end
 
-if camNum == 1 %imagingSource camera
-update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
-try 
-    vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
-catch 
-    vid = [];src = []; image = []; hImage = [];
-    axes(handles.imagePlot);axis off;
-    warning('ImagingSource Camera is not connected!!');
-end
-elseif camNum == 2 %hamatsu camera;
-    update_waitbar(handles,0,'Initializing Hamamatsu camera.............Please wait......',1);
-    try
-        vid = videoinput('hamamatsu', 1, 'MONO8_1344x1024');
-    catch
-        vid = [];src = []; image = []; hImage = [];
-        axes(handles.imagePlot);axis off;
-        warning('Hamamatsu Camera is not connected!!');
+if camNum == curCamNum% select current using cam
+    vid = acquireOpt.camera.vid;
+else
+    switch camNum
+        case 1%imagingSource camera
+            update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
+            try
+                vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
+            catch
+                vid = [];src = []; image = []; hImage = [];
+                axes(handles.imagePlot);axis off;
+                update_waitbar(handles,0,'ImagingSource Camera is not connected!!',1);
+                set(hObject,'Value',curCamNum);
+                return;
+            end
+        case  2%hamatsu camera;
+            update_waitbar(handles,0,'Initializing Hamamatsu camera.............Please wait......',1);
+            try
+                vid = videoinput('hamamatsu', 1, 'MONO8_1344x1024');
+            catch
+                vid = [];src = []; image = []; hImage = [];
+                axes(handles.imagePlot);axis off;
+                update_waitbar(handles,0,'Hamamatsu Camera is not connected!!',1);
+                set(hObject,'Value',curCamNum);
+                return;
+            end
     end
 end
 
@@ -2129,8 +2161,8 @@ if ~isempty(vid)
         delete(vid);
         vid = []; src = [];    image = [];    hImage = [];
         axes(handles.imagePlot);axis off;
-        warning('Camera is occupied!!');
         update_waitbar(handles,0,'Camera is used by another application!!!',1);
+        return;
     end
 end
 if ~isempty(vid)    
