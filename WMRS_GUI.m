@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 13-Dec-2016 14:12:15
+% Last Modified by GUIDE v2.5 05-Jan-2017 11:21:08
 
 % Begin initialization code - DO NOT EDIT
 
@@ -456,7 +456,14 @@ setUserData('acquireOpt',acquireOpt);
 setUserData('fileOpt',fileOpt);
 setUserData('spectrometer',spectrometer);
 
-movegui(hObject,'center'); %move window to the center of screen;
+%set window to centre;
+set(handles.wmrs_figure,'Units', 'pixels' );
+screenSize = get(groot, 'ScreenSize');
+position = get(handles.wmrs_figure,'Position');
+position(1) = (screenSize(3)-position(3))/2;
+position(2) = (screenSize(4)-position(4))/2;
+set(handles.wmrs_figure,'Position', position);
+movegui('center'); %move window to the center of screen;
 update_waitbar(handles,0,'System is ready for use...........................');
 %Enable buttons
 SetAllGUIButtons(handles,1);
@@ -464,6 +471,16 @@ set(handles.abortAcquiring,'Enable','off');
 set(hObject,'CloseRequestFcn',@closeApp);
 % UIWAIT makes WMRS_GUI wait for user response (see UIRESUME)
 % uiwait(handles.wmrs_figure);
+
+
+% --- Executes during object creation, after setting all properties.
+function wmrs_figure_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to wmrs_figure (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+movegui('center'); %move window to the center of screen;clc
+
+
 
 function closeApp(obj,event)
 %SaveAll training data
