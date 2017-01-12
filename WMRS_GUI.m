@@ -1131,7 +1131,11 @@ function laserMarker_Callback(hObject, eventdata, handles)
 % hObject    handle to laserMarker (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+modifiers = get(gcf,'currentModifier');
+ctrlIsPressed = ismember('control',modifiers); %Press Ctrl button in order to take the backgrond spectra;
+if ~ctrlIsPressed
+    return;
+end
 acquireOpt = getUserData('acquireOpt');
 % acquireOpt.isRealTimeImaging = get(handles.isRealTimeImaging,'Value');
 
