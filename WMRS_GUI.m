@@ -192,6 +192,7 @@ function WMRS_GUI_OpeningFcn(hObject, eventdata, handles, varargin)
 % Choose default command line output for WMRS_GUI
 handles.output = hObject;
 set(hObject, 'resize', 'off');
+set(hObject,'Position',[100 5 1850 1000]);
 clc;
 
 % Update handles structure
@@ -467,8 +468,10 @@ movegui('center'); %move window to the center of screen;
 update_waitbar(handles,0,'System is ready for use...........................');
 %Enable buttons
 SetAllGUIButtons(handles,1);
+
 set(handles.abortAcquiring,'Enable','off');
 set(hObject,'CloseRequestFcn',@closeApp);
+set(hObject,'Position',[100 5 1850 1000]);
 % UIWAIT makes WMRS_GUI wait for user response (see UIRESUME)
 % uiwait(handles.wmrs_figure);
 
@@ -2366,13 +2369,17 @@ update_waitbar(handles,0,str);
 if laser.src == 0 %3900s
     if length(laser.start)==2
         set(handles.laserStart,'String',num2str(laser.start(2)));
+        lambdamin = laser.start(2);
     else
         set(handles.laserStart,'String',num2str(16.3));
+        lambdamin = 16.3;
     end
     if length(laser.end)==2
         set(handles.laserEnd,'String',num2str(laser.end(2)));
+        lambdamax = laser.end(2);
     else
         set(handles.laserEnd,'String',num2str(16.45));
+        lambdamax = 16.45;
     end
     
     if isempty(laser.smc)
@@ -2415,7 +2422,7 @@ if laser.src == 0 %3900s
     end
     laser.smc.velocity = 0.1; %high speed;
     laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
-    pause(lambdaincr/0.2); %wait to position;
+    pause((lambdamax-lambdamin)/0.2); %wait to position;
     update_waitbar(handles,0,sprintf('Laser has been tuned to %3.1fnm',(laser.start(1)+laser.end(1))/2));
 elseif laser.src == 1%Solstis;      
     set(handles.laserStart,'String',num2str(laser.start(1)));
