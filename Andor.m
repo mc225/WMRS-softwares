@@ -142,7 +142,7 @@ classdef Andor < handle
             
             if ret == 20002
                 if nargin < 6
-                    PreAmpGain = 0;                   % PreAmpGain, 0 - 1x by default, 1 - 2x, 2 - 4x;
+                    PreAmpGain = 1;                   % PreAmpGain, 0 - 1x by default, 1 - 2x, 2 - 4x;
                 end
                 Andor.PreAmpGain = PreAmpGain;
             end
