@@ -275,9 +275,9 @@ ylabel('Raman intensity (counts)');
 
 %initialize camera; %current support only imagingSource USB cam;
 update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
+camNum = 1;
 try 
     vid = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
-    camNum = 1;
 catch 
     vid = [];src = []; image = []; hImage = [];
     axes(handles.imagePlot);axis off;
@@ -286,7 +286,7 @@ end
 if isempty(vid)
     update_waitbar(handles,0,'Initializing Hamamatsu camera.............Please wait......',1);
     try
-        vid = videoinput('hamamatsu', 1, 'MONO8_1344x1024');
+        vid = videoinput('hamamatsu', 1, 'MONO8_1344x1024');        
         camNum = 2;
     catch
         vid = [];src = []; image = []; hImage = [];

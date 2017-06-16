@@ -14,6 +14,7 @@ classdef Andor < handle
                      %         9 - External FVB EM (only valid for EM Newton models in FVB mode)	10.	Software Trigger
                      %         12 - External Charge Shifting
     %               PreAmpGain, 0 - 1x, 1 - 2x, 2 - 4x;
+    %               ReadOutRate,    Readout rate in MHz   
     %               NumberKinetics;             number of kinectcs; = 1 by default;
     %               NumberAccumulations;        Number of Accumulations = 1 by default;
     %               CCD_Pixels;                 %[CCD_XPixels, CCD_YPixels];   physical CCD pixels
@@ -46,6 +47,7 @@ classdef Andor < handle
         ReadMode; 
         TriggerMode;
         PreAmpGain;
+        ReadOutRate;
         NumberAccumulations;
         NumberKinetics;
         CropHeight;   %CCD crop mode
@@ -73,7 +75,7 @@ classdef Andor < handle
     end
     
     methods
-        function Andor = Andor(CCDSettingTemp, AcquisitionMode, ExposureTime, ReadMode, TriggerMode, PreAmpGain, NumberKinetics, NumberAccumulations,CropHeight,CosmicRayFilterOn)
+        function Andor = Andor(CCDSettingTemp, AcquisitionMode, ExposureTime, ReadMode, TriggerMode, PreAmpGain, NumberKinetics, NumberAccumulations,CropHeight,CosmicRayFilterOn,ReadOutRate)
             fprintf('Initialising Andor camera... please wait!......');
             [ret]=AndorInitialize('');      %initialization camera
             CheckError(ret);
@@ -166,9 +168,13 @@ classdef Andor < handle
             
             if nargin < 10
                 CosmicRayFilterOn = 1;      %Cosmic ray removal on;
-            end
+            end            
+            Andor.CosmicRayFilterOn = CosmicRayFilterOn;   
             
-            Andor.CosmicRayFilterOn = CosmicRayFilterOn; 
+            if nargin < 10
+                ReadOutRate = 1;   %1MHz read out rate, 0: 50kHz, 2: 3MHz
+            end
+            Andor.ReadOutRate = ReadOutRate;      %Readout Rate;
             
             %%%%%%get grating information;
             [ret, Lines, Blaze, Home, Offset] = ShamrockGetGratingInfo(Andor.ShamrockDev, Andor.CurrentGrating);
@@ -177,6 +183,18 @@ classdef Andor < handle
             %%%%%%
             fprintf('Andor is ready to use...\n');
         end
+        
+        function Andor = set.ReadOutRate(Andor,newReadOutRate)
+            [ret, speeds] = GetNumberHSSpeeds(0, 0);
+            CheckWarning(ret);
+            if newReadOutRate>=speeds
+                newReadOutRate = speeds - 1;
+            end
+            Andor.ReadOutRate = newReadOutRate;
+            [ret] = SetHSSpeed(0, newReadOutRate);
+            CheckWarning(ret);
+        end
+        
         function CurrentGrating = get.CurrentGrating(Andor)
             CurrentGrating = GetCurrentGrating(Andor);
         end
@@ -742,8 +760,7 @@ classdef Andor < handle
                 ShamrockCheckWarning(ret);
                 fprintf('New grating Info: %d lines/mm, Blaze@%snm, Offset: %d, SlitWidth: %dum\n',Lines,Blaze,Offset,Andor.SlitWidth);
             end
-        end     
-        
+        end           
     end
     
     methods (Static = true)
