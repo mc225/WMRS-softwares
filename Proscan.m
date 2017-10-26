@@ -31,11 +31,11 @@ properties
         stepsOneMovement;       %user defined how many steps in one movement, [xu yu]; 
         motorMaxSpeed;          %motor max speed using for movement; range [1:200]; 
         motorAcceleration;      %motor acceleration using for movement; range [1:150]; 
-        umPerStep;               %one step in um;
+        umPerStep;              %one step in um; %read only;
     end
     
     properties(Access = private,  Constant = true)
-        showMessage = 0;    %display messages; mainly for debug;
+        showMessage = 1;    %display messages; mainly for debug;
         movingRange = 4;    %move away from orig for 4mm, mainly limited by the objective and the hole on the microscope; stepsLimit
     end
     
@@ -299,7 +299,7 @@ properties
                 fclose(Proscan.stageObj);
                 Proscan.stageObj = [];
                 if Proscan.showMessage
-                    disp('Stage objective has be released!');
+                    disp('Stage objective has been released!');
                 end
             end
         end

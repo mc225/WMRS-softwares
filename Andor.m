@@ -14,7 +14,7 @@ classdef Andor < handle
                      %         9 - External FVB EM (only valid for EM Newton models in FVB mode)	10.	Software Trigger
                      %         12 - External Charge Shifting
     %               PreAmpGain, 0 - 1x, 1 - 2x, 2 - 4x;
-    %               ReadOutRate,    Readout rate in MHz   
+%     %               ReadOutRate,    Readout rate in MHz   
     %               NumberKinetics;             number of kinectcs; = 1 by default;
     %               NumberAccumulations;        Number of Accumulations = 1 by default;
     %               CCD_Pixels;                 %[CCD_XPixels, CCD_YPixels];   physical CCD pixels

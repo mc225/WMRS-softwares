@@ -457,6 +457,13 @@ setUserData('acquireOpt',acquireOpt);
 setUserData('fileOpt',fileOpt);
 setUserData('spectrometer',spectrometer);
 
+%initialize the proscan stage;
+proscan = Proscan();
+setUserData('proscan',proscan);
+%initialize microscope;
+nikon = NikonMicroscope();
+setUserData('nikon',nikon);
+
 %set window to centre;
 set(handles.wmrs_figure,'Units', 'pixels' );
 screenSize = get(groot, 'ScreenSize');
@@ -515,6 +522,16 @@ if ~isempty(laser.sol) %release solstis;
     echotcpip('off');
 end
 
+%release stage;
+proscan = getUserData('proscan');
+if ~isempty(proscan.stageObj)
+    proscan.releaseProscan;
+end
+%release micrscope;
+nikon = getUserData('nikon');
+if ~isempty(nikon.scopeObj)
+    nikon.release;
+end
 save('systemInit.mat','laser','','fileOpt','spectrometer');
 disp('GUI is terminated...');
 closereq();
@@ -1944,7 +1961,10 @@ function emergStop_Callback(hObject, eventdata, handles)
 % hObject    handle to emergStop (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-SetAllGUIButtons(handles,1);
+proscan = getUserData('proscan');
+if ~isempty(proscan.stageObj)
+    proscan.stop;
+end
 
 
 
