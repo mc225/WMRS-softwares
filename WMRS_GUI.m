@@ -1,7 +1,7 @@
 function varargout = WMRS_GUI(varargin)
 % WMRS_GUI MATLAB code for WMRS_GUI.fig
 
-% Last Modified by GUIDE v2.5 05-Jan-2017 11:21:08
+% Last Modified by GUIDE v2.5 16-Nov-2017 13:49:05
 
 % Begin initialization code - DO NOT EDIT
 
@@ -272,6 +272,7 @@ axes(handles.specPlot);
 xlabel('Raman shift (nm)');
 ylabel('Raman intensity (counts)');
 
+instrreset; %reset all COM instruments in order to avoid any previous crash.
 
 %initialize camera; %current support only imagingSource USB cam;
 update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
@@ -463,6 +464,9 @@ setUserData('proscan',proscan);
 %initialize microscope;
 nikon = NikonMicroscope();
 setUserData('nikon',nikon);
+if isempty(nikon.scopeObj)
+    
+end
 
 %set window to centre;
 set(handles.wmrs_figure,'Units', 'pixels' );
@@ -810,16 +814,16 @@ if isempty(acquireOpt.andor)
     update_waitbar(handles,0,'Andor is not initialized!',1);
     return;
 end
-if fileOpt.saveOpt==1 || fileOpt.saveOpt == 2 %save spectra into sif file or both;    
-    if fileOpt.autoSuffix
-        suffix = str2num(fileOpt.fname(end-2:end));
-        if isempty(suffix)
-            update_waitbar(handles,0,'Please name the file with 3 digits at the end as *_001',1);
-            return;
-        else
-            newfname = [fileOpt.fname(1:end-3) num2str(suffix+1,'%03d')];
-        end 
+if fileOpt.autoSuffix
+    suffix = str2num(fileOpt.fname(end-2:end));
+    if isempty(suffix)
+        update_waitbar(handles,0,'Please name the file with 3 digits at the end as *_001',1);
+        return;
+    else
+        newfname = [fileOpt.fname(1:end-3) num2str(suffix+1,'%03d')];
     end
+end
+if fileOpt.saveOpt==1 || fileOpt.saveOpt == 2 %save spectra into sif file or both;        
     fname = [fileOpt.specFolder filesep fileOpt.fname '.sif'];
     acquireOpt.andor.saveSIF(fname);
     if laser.continuous == 0 %step tuning, no kinetis used.
@@ -829,17 +833,14 @@ if fileOpt.saveOpt==1 || fileOpt.saveOpt == 2 %save spectra into sif file or bot
             return;
         end
     end        
-    update_waitbar(handles,0,sprintf('Current spectra have been save into sif file: %s.........',fname));
-    if fileOpt.autoSuffix
-        fileOpt.fname = newfname;
-        set(handles.fileName,'String',newfname);
-        setUserData('fileOpt',fileOpt);
-    end
+    update_waitbar(handles,0,sprintf('Current spectra have been save into sif file: %s.........',fname));    
 end
 
 if fileOpt.saveOpt==0 || fileOpt.saveOpt == 2  %save image or both;
    %stop and take an image;
+   realDisp = 0;
    if acquireOpt.isRealTimeImaging
+       realDisp = 1;
        set(handles.isRealTimeImaging,'Value',0);
        if ~isempty(acquireOpt.camera.vid)
            start(acquireOpt.camera.vid);
@@ -853,17 +854,7 @@ if fileOpt.saveOpt==0 || fileOpt.saveOpt == 2  %save image or both;
    end
     setUserData('acquireOpt',acquireOpt);
     if ~isempty(acquireOpt.image)
-        if fileOpt.autoSuffix
-            suffix = str2num(fileOpt.fname(end-2:end));
-            if isempty(suffix)
-                update_waitbar(handles,0,'Please name the file with 3 digits at the end as *_001',1);
-                return;
-            else
-                fname = [fileOpt.imgFolder filesep fileOpt.fname(1:end-3) num2str(suffix-1,'%03d') '.tif'];
-            end
-        else
-            fname = [fileOpt.imgFolder filesep fileOpt.fname '.tif'];
-        end
+        fname = [fileOpt.imgFolder filesep fileOpt.fname '.tif'];
         if exist(fileOpt.imgFolder,'dir') == 0
             mkdir(fileOpt.imgFolder);
         end
@@ -872,6 +863,18 @@ if fileOpt.saveOpt==0 || fileOpt.saveOpt == 2  %save image or both;
     else
         update_waitbar(handles,0,'No image has been acquired or Camera is not ready!',1);
     end
+    if realDisp == 1 %set it back to real time display
+        if ~isempty(acquireOpt.camera.vid)
+            setappdata(acquireOpt.hImage,'UpdatePreviewWindowFcn',@mypreview_fcn);
+            preview(acquireOpt.camera.vid, acquireOpt.hImage);
+            update_waitbar(handles,0,'Camera in preview mode....',1);
+        end
+    end
+end
+if fileOpt.autoSuffix
+    fileOpt.fname = newfname;
+    set(handles.fileName,'String',newfname);
+    setUserData('fileOpt',fileOpt);
 end
 
 
@@ -1237,6 +1240,12 @@ function isRealTimeImaging_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 acquireOpt = getUserData('acquireOpt');
 acquireOpt.isRealTimeImaging = get(hObject,'Value');
+
+if isempty(acquireOpt.camera)
+    update_waitbar(handles,0,'No camera is ready!',1);
+    return;
+end
+
 if acquireOpt.isRealTimeImaging
     if ~isempty(acquireOpt.camera.vid)        
         setappdata(acquireOpt.hImage,'UpdatePreviewWindowFcn',@mypreview_fcn);
@@ -1388,6 +1397,462 @@ if fileOpt.saveOpt == 0 || fileOpt.saveOpt == 2 %open image or both;
         update_waitbar(handles,0,sprintf('can not have been opened image from: %s.........',fname),1);
     end
 end
+function acquireSpec(spectrometer, laser, acquireOpt)
+%acquire a Raman spectrum into memory
+ad = acquireOpt.andor;
+acquireOpt.acquiringAborted=0;
+setUserData('acquireOpt',acquireOpt);
+if laser.src == 1 %solstis    
+    lambdamin=min(laser.start(1),laser.end(1));
+    lambdamax=max(laser.start(1),laser.end(1));
+else %3900s
+    lambdamin=min(laser.start(2),laser.end(2));
+    lambdamax=max(laser.start(2),laser.end(2));
+end 
+if spectrometer.scans > 1 %may WMRS
+    lambdaincr=lambdamax-lambdamin;
+    lambda = linspace(lambdamin,lambdamax,spectrometer.scans);
+    if laser.src == 1 %solstis
+        laser.counter = solstisWAVE(laser.sol,laser.counter,lambdamin); %move to min wavelength;
+    else %3900s
+        laser.smc.velocity = 0.1; %high speed;
+        laser.smc.moveTo(lambdamin); %move to min wavelengh
+        pause(lambdaincr/0.1);%wait to position;
+    end
+    if laser.continuous == 1 %continuous tuning;
+        if ad.ReadMode ~=0  %set to FVB mode;
+            ad.ReadMode=0;
+        end
+        if ad.AcquisitionMode ~=3  %set to Kinetics mode;
+            ad.AcquisitionMode=3;
+        end
+        scantime = spectrometer.accums*spectrometer.exposureTime*spectrometer.scans;
+        if laser.src==0 %3900s;
+            laser.smc.velocity = lambdaincr/scantime; %mm/s            
+        end
+        if ad.startAcquire == 1
+            if laser.src == 1 %solstis
+                tic;
+                while toc<scantime
+                    if acquireOpt.acquiringAborted == 1
+                        break;
+                    end
+                    lam=lambdamin+toc/scantime*lambdaincr;
+                    laser.counter = solstisWAVE(laser.sol, laser.counter, lam);
+                    if toc/scantime<=1
+                        perc = toc/scantime;
+                    else
+                        perc = 1;
+                    end
+                end
+            else %3900s
+                laser.smc.moveTo(lambdamax);
+                last = 0;
+                while last<spectrometer.scans
+                    acquireOpt = getUserData('acquireOpt');
+                    if acquireOpt.acquiringAborted == 1
+                        break;
+                    end
+                    [ret, first,last] = GetNumberNewImages(); %use andor SDK function directly here,                     
+                    pause(spectrometer.accums*spectrometer.exposureTime);
+                end
+            end
+            while ad.isAndorIdle~=1
+                %wait until acquisition finish;
+            end            
+            if acquireOpt.acquiringAborted == 0 %abort button was not pressed;
+                acquireOpt.spectra=(ad.getImage).';
+            end
+        else
+            acquireOpt.spectra = [];           
+        end
+        setUserData('acquireOpt',acquireOpt);
+    elseif laser.continuous == 0 %step tuning;
+        if ad.ReadMode ~=0  %set to FVB mode;
+            ad.ReadMode=0;
+        end
+        if spectrometer.accums == 1
+            if ad.AcquisitionMode ~=1  %set to single scan mode;
+                ad.AcquisitionMode=1;
+            end
+        else
+            if ad.AcquisitionMode ~=2  %set to accumulation mode;
+                ad.AcquisitionMode = 2;
+            end
+        end
+        acquireOpt.spectra=[];        
+        for mm = 1:spectrometer.scans
+            acquireOpt = getUserData('acquireOpt');
+            if acquireOpt.acquiringAborted == 1
+                break;
+            end
+            if laser.src == 1 %solstis
+                laser.counter = solstisWAVE(laser.sol, laser.counter, lambda(mm));
+            else %3900s
+                laser.smc.moveTo(lambda(mm));
+            end   
+            spec = ad.acquire0;cc=0;
+            while isempty(spec)||(~all(spec)) && cc<5 %try 5 time to ensure acquire data;
+                spec = ad.acquire0;
+                cc=cc+1;
+            end
+            if ~isempty(spec)
+                acquireOpt.spectra = [acquireOpt.spectra spec];
+            end
+            setUserData('acquireOpt',acquireOpt);
+        end
+    elseif laser.continuous == 2 %no modulation tuning;        
+        if laser.src == 1 %solstis
+            laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        else %3900s
+            laser.smc.velocity = 0.1; %high speed;
+            laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
+            pause(lambdaincr/0.2); %wait to position;
+        end
+        if ad.ReadMode ~=0  %set to FVB mode;
+            ad.ReadMode=0;
+        end
+        if ad.AcquisitionMode ~=3  %set to Kinetics mode;
+            ad.AcquisitionMode=3;
+        end
+        if ad.startAcquire == 1
+            for m = 1:spectrometer.scans
+                acquireOpt = getUserData('acquireOpt');
+                if acquireOpt.acquiringAborted == 1
+                    break;
+                end
+                pause(spectrometer.accums*spectrometer.exposureTime);
+            end
+            while ad.isAndorIdle~=1
+                %wait until acquisition finish;
+            end
+            if acquireOpt.acquiringAborted == 0
+                if ctrlIsPressed %take the background;
+                    acquireOpt.background=(ad.getImage).';
+                else
+                    acquireOpt.spectra=(ad.getImage).';
+                end
+            end
+        else %acquiring is not started correctly. 
+            acquireOpt.spectra = [];
+        end
+        setUserData('acquireOpt',acquireOpt);
+        spectrometer.isWMRS = 0;
+    end
+    if laser.continuous<2 
+        if laser.src == 1 %solstis
+            laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+        else %3900s
+            laser.smc.velocity = 0.1; %high speed;
+            laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
+            pause(lambdaincr/0.2); %wait to position;
+        end
+    end
+    if acquireOpt.acquiringAborted == 0 %not cancelled
+        if isempty(acquireOpt.spectra)
+            acquireOpt.WMRSpectrum = [];
+        else
+            if all(size(acquireOpt.spectra)==size(acquireOpt.background))&&acquireOpt.signalBackRef==2
+                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra-acquireOpt.background,laser.ramanPeak);
+            else
+                acquireOpt.WMRSpectrum = calculateWMRspec(acquireOpt.spectra,laser.ramanPeak);
+            end
+        end
+        acquireOpt.axisWavelength = ad.AxisWavelength;
+        setUserData('acquireOpt',acquireOpt);
+    end    
+else %single spectra
+    if ad.ReadMode ~=0  %set to FVB mode;
+        ad.ReadMode=0;
+    end
+    if spectrometer.accums == 1
+        if ad.AcquisitionMode ~=1  %set to single scan mode;
+            ad.AcquisitionMode=1;
+        end
+    else
+        if ad.AcquisitionMode ~=2  %set to accumulation mode;
+            ad.AcquisitionMode = 2;
+        end
+    end
+    if laser.src == 1 %solstis
+        laser.counter = solstisWAVE(laser.sol,laser.counter,(lambdamin+lambdamax)/2); %set wavelength back to middle;
+    else %3900s
+        laser.smc.moveTo((lambdamin+lambdamax)/2);%set wavelength back to middle;
+    end
+    spectrometer.isWMRS = 0;
+        
+    if ad.startAcquire == 1        
+        while ad.isAndorIdle~=1
+            %wait until acquisition finish;
+            acquireOpt = getUserData('acquireOpt');
+            if acquireOpt.acquiringAborted
+                break;
+            end
+        end
+        if acquireOpt.acquiringAborted == 0%no cancellation
+            acquireOpt.spectra=(ad.getImage).';
+            acquireOpt.axisWavelength = ad.AxisWavelength;
+            acquireOpt.WMRSpectrum = [];            
+        end
+    else
+        acquireOpt.spectra = [];
+    end
+    setUserData('acquireOpt',acquireOpt);
+end
+setUserData('acquireOpt',acquireOpt);
+setUserData('spectrometer',spectrometer);
+setUserData('laser',laser);
+
+function totNumber = AutoAcquring(hObject, eventdata, handles,holdTime,endTime,delayTime,maxAcquirements)
+%automatic acquirements, 06/11/2017
+acquireOpt = getUserData('acquireOpt');
+ad = acquireOpt.andor;
+laser = getUserData('laser');
+spectrometer = getUserData('spectrometer');
+fileOpt = getUserData('fileOpt');
+saveOpt = fileOpt.saveOpt;
+%proscan = getUserData('proscan');
+nikon = getUserData('nikon');
+totNumber = 0;
+if isempty(ad)
+    update_waitbar(handles,0,'No Andor spectrometer was connected!',1);
+    return;
+end
+if laser.src == 1 %solstis
+    if isempty(laser.sol)
+        update_waitbar(handles,0,'No SolsTis laser was connected!',1);
+        return;
+    end
+else
+    if isempty(laser.smc)
+        update_waitbar(handles,0,'No 3900s laser was connected!',1);
+        return;
+    end
+end
+% if isempty(proscan.stageObj)
+%     update_waitbar(handles,0,'No Proscan stage was connected!',1);
+%     return;
+% end
+if isempty(nikon.scopeObj)
+    update_waitbar(handles,0,'No Nikon Microscope was connected!',1);
+    return;
+end
+
+spectrometer.isWMRS = 0;
+set(handles.isWMRS,'Value',spectrometer.isWMRS);
+
+%delete camera;
+if ~isempty(acquireOpt.camera)
+    stop(acquireOpt.camera.vid);
+    delete(acquireOpt.camera.vid);
+    acquireOpt.camera = [];
+end
+setUserData('acquireOpt',acquireOpt);
+%initilize ImagingSource cameras;
+try
+    vid1 = videoinput('tisimaq_r2013', 1, 'RGB24 (1280x960)');
+catch
+    update_waitbar(handles,0,'ImagingSource Camera is not connected!!',1);
+    return;
+end
+if ~isempty(vid1)
+    src1 = getselectedsource(vid1);
+    vid1.FramesPerTrigger = 1;    
+    try
+        start(vid1);
+    catch
+        stop(vid1);
+        delete(vid1);
+        update_waitbar(handles,0,'ImagingSource Camera is used by another application!!!',1);
+        return;
+    end
+end
+if ~isempty(vid1)   
+    src1.ExposureAuto = 'On'; 
+end
+
+try
+    vid2 = videoinput('hamamatsu', 1, 'MONO8_1344x1024');
+catch
+    update_waitbar(handles,0,'Hamamatsu Camera is not connected!!',1);
+    return;
+end
+
+if ~isempty(vid2)
+    src2 = getselectedsource(vid2);
+    vid2.FramesPerTrigger = 1;    
+    try
+        start(vid2);
+    catch
+        stop(vid2);
+        delete(vid2);
+        update_waitbar(handles,0,'Hamamtsz Camera is used by another application!!!',1);
+        return;
+    end
+end
+if ~isempty(vid2)   
+    src2.ExposureTime = 20/1000; %intial exp time; 
+end
+
+%calculate time;
+OneSpecTime = delayTime+spectrometer.exposureTime*spectrometer.exposureTime*spectrometer.scans+4;
+estTime = etime(datevec(endTime),datevec(now))-holdTime;
+estSpecNum = floor(estTime/OneSpecTime);
+if estSpecNum > maxAcquirements    
+    finalAcqSpecNum = maxAcquirements;
+else
+    finalAcqSpecNum = estSpecNum;
+end
+
+while(holdTime>0)
+    update_waitbar(handles,0,['Autmated acquire ' num2str(finalAcqSpecNum) ' spectra will started in ' num2str(holdTime)],1);
+    pause(1);
+    holdTime = holdTime - 1;
+end
+
+stopKey = get(gcf,'CurrentCharacter');
+if finalAcqSpecNum>1
+stopInform = 'Press 0 on keyboard to stop at any time!';
+update_waitbar(handles,0,['Start acquiring spectra.......' stopInform],0);
+else
+    update_waitbar(handles,0,'Start acquiring spectra........',0);
+end
+
+stopKey ='';
+[ret] = PrepareAcquisition(); %use SDK directly
+while not(strcmp(stopKey,'0'))  && totNumber<maxAcquirements
+    nowTime = datetime(datestr(now),'InputFormat','dd-MMM-yyyy HH:mm:ss');
+    if nowTime>endTime
+        break;
+    end
+    str = sprintf('Acquiring %d spectra.........%s',totNumber+1,stopInform);
+    update_waitbar(handles,0,str,1); 
+    %Acquire one spectrum;
+    stopKey = get(gcf,'CurrentCharacter'); 
+    if ~strcmp(nikon.opticalPath,'left')
+        nikon.opticalPath =  'left';
+        pause(3);
+    end    
+    if nikon.lamp == 1
+        nikon.lamp = 0; pause(0.5);
+    end
+    if strcmp(stopKey,'0')
+        break;
+    end
+    acquireOpt.spectra = [];
+    acquireSpec(spectrometer, laser, acquireOpt);  
+    acquireOpt = getUserData('acquireOpt');
+    updateWMRSpec(handles,acquireOpt.axisWavelength,acquireOpt.spectra);%update figure;
+    if fileOpt.autoSuffix
+        suffix = str2num(fileOpt.fname(end-2:end));
+        if isempty(suffix)
+            update_waitbar(handles,0,'Please name the file with 3 digits at the end as *_001',1);
+            break;
+        else
+            newfname = [fileOpt.fname(1:end-3) num2str(suffix+1,'%03d')];
+        end
+    end
+    %save spectrum;
+    fname = [fileOpt.specFolder filesep fileOpt.fname '.sif'];
+    acquireOpt.andor.saveSIF(fname);
+    if laser.continuous == 0 %step tuning, no kinetis used.
+        replaceSifData(fname,acquireOpt.spectra,size(acquireOpt.spectra,2)); %replace the data in the sif file as single scan mode used for WMRS;
+    end        
+    update_waitbar(handles,0,sprintf('Current spectra have been save into sif file: %s.........',fname)); 
+    %sav image every 5 spectra
+    image = [];
+    if mod((totNumber+1),10)==0
+        nikon.lamp=1;
+        if strcmp(nikon.opticalPath,'right')
+            pause(1);
+        else
+            nikon.opticalPath =  'right';
+            pause(3);
+        end
+        if ~isempty(vid2)
+            start(vid2);
+            pause(src2.ExposureTime);
+            image = fliplr(getdata(vid2));
+            stoppreview(vid2);
+            if (strcmpi(vid2.Running,'on'))
+                stop(vid2);
+            end
+        end
+        nikon.opticalPath =  'left'; pause(1.5);%turn it back to left;
+    elseif mod((totNumber+1),5)==0 || totNumber == 0
+        nikon.lamp=1; pause(1);             
+        if ~isempty(vid1)
+            start(vid1);
+            pause(0.05);
+            image = getdata(vid1);
+            stoppreview(vid1);
+            if (strcmpi(vid1.Running,'on'))
+                stop(vid1);
+            end
+        end        
+    end 
+    %save image  
+    if mod((totNumber+1),5)==0 || totNumber == 0
+        if ~isempty(image)
+            axes(handles.imagePlot);
+            setappdata(imagesc(image),'UpdatePreviewWindowFcn',@mypreview_fcn);axis image;axis off;
+            if ~isempty(laser.marker)
+                x=laser.marker(1);y=laser.marker(2);
+                h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
+                laser.markerCross(1)=h;
+                h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
+                laser.markerCross(2)=h;
+            end
+            fname = [fileOpt.imgFolder filesep fileOpt.fname '.tif'];
+            if exist(fileOpt.imgFolder,'dir') == 0
+                mkdir(fileOpt.imgFolder);
+            end
+            imwrite(image,fname,'tif');
+            update_waitbar(handles,0,sprintf('Current image have been save into tif file: %s.........',fname));
+        else
+            update_waitbar(handles,0,'No image has been acquired or Camera is not ready!',1);
+        end
+    else
+        %show image
+        nikon.lamp = 1;
+        start(vid1);
+        pause(0.05);
+        image = getdata(vid1);
+        stoppreview(vid1);
+        if (strcmpi(vid1.Running,'on'))
+            stop(vid1);
+        end
+        axes(handles.imagePlot);setappdata(imagesc(image),'UpdatePreviewWindowFcn',@mypreview_fcn);axis image;axis off;
+        if ~isempty(laser.marker)
+            x=laser.marker(1);y=laser.marker(2);
+            h=line([x-10 x+10],[y y],'LineStyle','-','Color',[1 0 0]);
+            laser.markerCross(1)=h;
+            h=line([x x],[y-10 y+10],'LineStyle','-','Color',[1 0 0]);
+            laser.markerCross(2)=h;
+        end
+        nikon.lamp = 0;
+    end
+    if fileOpt.autoSuffix
+        fileOpt.fname = newfname;
+        set(handles.fileName,'String',newfname);
+        setUserData('fileOpt',fileOpt);
+    end
+    if strcmp(stopKey,'0')
+        break;
+    end
+    nikon.lamp=0;
+    pause(delayTime);
+    totNumber = totNumber+1;     
+    stopKey = get(gcf,'CurrentCharacter');       
+end
+%delete the temporary camera; 
+stop(vid1);
+delete(vid1);
+stop(vid2);
+delete(vid2);
+setUserData('fileOpt',fileOpt);
+setUserData('acquireOpt',acquireOpt);
+setUserData('nikon',nikon);
 
 % --- Executes on button press in acquireSpec.
 function acquireSpec_Callback(hObject, eventdata, handles)
@@ -1397,9 +1862,50 @@ function acquireSpec_Callback(hObject, eventdata, handles)
 
 modifiers = get(gcf,'currentModifier');
 ctrlIsPressed = ismember('control',modifiers); %Press Ctrl button in order to take the backgrond spectra;
+altIsPressed = ismember('alt',modifiers); %Press Ctrl button in order to take the backgrond spectra;
+shiftIsPressed = ismember('shift',modifiers); %Press Ctrl button in order to take the backgrond spectra;
+
+if altIsPressed && shiftIsPressed %both shift and alt keys have been pressed;%only do automatic acquirement
+    prompt = {'Enter automation end time (dd-MMM-yyyy HH:mm:ss):  ','Or enter number of acquirements:','Delay between two acquiring (min): ', 'Hold before acquirements start (s): '};
+    dlg_title = 'Input automatic acquiring parameters';
+    num_lines = 1;
+    stopTime = datestr(now); %t1 = datetime(stopTime,'InputFormat','dd-MMM-yyyy HH:mm:ss');
+    defaultans = {stopTime,'10000','5', '60'};
+    answer = inputdlg(prompt,dlg_title,num_lines,defaultans);
+    if ~isempty(answer)
+        if ~isempty(cell2mat(answer(1)))
+            endTime = datetime(answer(1),'InputFormat','dd-MMM-yyyy HH:mm:ss');
+        else
+            endTime = [];
+        end
+        if ~isempty(str2num(cell2mat(answer(2))))
+            maxAcquirements = str2num(cell2mat(answer(2)));
+        else
+            maxAcquirements = 10000;
+        end
+        if ~isempty(str2num(cell2mat(answer(4))))
+            holdTime = str2num(cell2mat(answer(4)));
+        else
+            holdTime = 0;
+        end
+        if ~isempty(str2num(cell2mat(answer(3))))
+            delayTime = str2num(cell2mat(answer(3)))*60;
+        else
+            delayTime = 300;
+        end
+        SetAllGUIButtons(handles,0);
+        set(handles.abortAcquiring,'Enable','on');
+        totalNum = AutoAcquring(hObject, eventdata, handles,holdTime, endTime,delayTime,maxAcquirements);
+        update_waitbar(handles,0,sprintf('Successfully acquired %d spectra',totalNum));
+        SetAllGUIButtons(handles,1);
+    end
+    return;
+end
+
 acquireOpt = getUserData('acquireOpt');
 laser = getUserData('laser');
 spectrometer = getUserData('spectrometer');
+nikon = getUserData('nikon');
 %fileOpt = getUserData('fileOpt');
 ad = acquireOpt.andor;
 if isempty(ad)
@@ -1416,6 +1922,14 @@ else
         update_waitbar(handles,0,'No 3900s laser was connected!',1);
         return;
     end
+end
+
+if ~isempty(nikon.scopeObj)
+    nikon.lamp = 0;
+    if ~strcmp(nikon.opticalPath,'left')
+        nikon.opticalPath =  'left';
+    end
+    setUserData('acquireOpt',nikon);
 end
 
 SetAllGUIButtons(handles,0);
@@ -2142,33 +2656,35 @@ function cameraSelect_Callback(hObject, eventdata, handles)
 %        contents{get(hObject,'Value')} returns selected item from cameraSelect
 acquireOpt = getUserData('acquireOpt');
 laser = getUserData('laser');
-if ~isempty(acquireOpt.camera.vid)
-    if ~isempty(strfind(acquireOpt.camera.vid.Name,'tisimaq_r2013'))
-        curCamNum = 1;
-    elseif ~isempty(strfind(acquireOpt.camera.vid.Name,'hamamatsu'))
-        curCamNum = 2;
-    else
-        curCamNum = 0;
-    end
-else
-    curCamNum = 0;
-end
+nikon = getUserData('nikon');
 camNum = get(hObject,'Value');
-
+curCamNum = 0;
 %stop current camera;
 if ~isempty(acquireOpt.camera)
-    if ishandle(acquireOpt.camera.vid)
+    if ~isempty(acquireOpt.camera.vid)
+        if ~isempty(strfind(acquireOpt.camera.vid.Name,'tisimaq_r2013'))
+            curCamNum = 1;
+        elseif ~isempty(strfind(acquireOpt.camera.vid.Name,'hamamatsu'))
+            curCamNum = 2;
+        else
+            curCamNum = 0;
+        end
+        
+    end
+end
+
+if camNum == curCamNum && (~isempty(acquireOpt.camera))% select current using cam
+    vid = acquireOpt.camera.vid;
+else
+    %delete current camera;
+    if ~isempty(acquireOpt.camera)
         if (strcmpi(acquireOpt.camera.vid.Running,'on'))
             stop(acquireOpt.camera.vid);
         end
         delete(acquireOpt.camera.vid);
         acquireOpt.camera = [];
     end
-end
-
-if camNum == curCamNum% select current using cam
-    vid = acquireOpt.camera.vid;
-else
+    
     switch camNum
         case 1%imagingSource camera
             update_waitbar(handles,0,'Initializing ImagingSource camera.............Please wait......',1);
@@ -2194,7 +2710,6 @@ else
             end
     end
 end
-
 if ~isempty(vid)
     src = getselectedsource(vid);
     vid.FramesPerTrigger = 1;    
@@ -2239,8 +2754,20 @@ if ~isempty(vid)
         otherwise
     end
     if camNum == 1 %imagingSource
+        if ~empty(nikon.scopeObj)
+            if strcmp(nikon.opticalPath,'right')
+                nikon.opticalPath =  'left';
+                pause(3);
+            end
+        end
         image = getdata(vid);
     elseif camNum == 2%hamatsu
+        if ~empty(nikon.scopeObj)
+            if strcmp(nikon.opticalPath,'left')
+                nikon.opticalPath =  'right';
+                pause(3);
+            end
+        end
         image = fliplr(getdata(vid));
     end       
     axes(handles.imagePlot);
@@ -2268,6 +2795,7 @@ if ~isempty(vid) && get(handles.isRealTimeImaging,'Value')
 end
 setUserData('laser',laser);
 setUserData('acquireOpt',acquireOpt);
+setUserData('acquireOpt',nikon);
 
 
 % --- Executes during object creation, after setting all properties.
@@ -2591,3 +3119,12 @@ function fileSaveOption_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in MicroscopeLamp.
+function MicroscopeLamp_Callback(hObject, eventdata, handles)
+% hObject    handle to MicroscopeLamp (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of MicroscopeLamp
